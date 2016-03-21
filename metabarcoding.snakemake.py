@@ -1,19 +1,22 @@
 import itertools
+import json
 
 from snakemake.utils import min_version
 from Bio import SeqIO
+import xml.etree.ElementTree as et
 
 min_version("3.5.4")
 
 configfile: "config.json"
 
-#samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
-samples =["D3_S20"]
+samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
+#samples =["A1_S1", "B1_S2"]
+
 
 rule all:
     input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html"
 #    input: "taxonomy/All.krona.html", "taxonomy/5_8s.krona.html", expand(["taxonomy/{sample}_ITS2.otus_5.8sClass.tsv", "taxonomy/{sample}.ITS2.otus.class.tsv"], sample=samples)
-    
+
 ################ generate reference sequence for 5.8S ##########################
 
 rule db_getRfamFile:
@@ -467,41 +470,133 @@ rule combineClassification:
             for conf, number in conflict.items():
                 out.write("%s | %s\t%i\n" % (conf[0], conf[1], number))
 
-
-rule kronaAllPrep:
+rule kronaAllPrepStep1:
     input: tax="taxonomy/{sample}.ITS2.otus.combClass.tsv", otus="swarm/{sample}.ITS2.otus.fasta"
-    output: "krona/{sample}_all.krona.tsv"
+    output: "krona/{sample}_all.krona.json"
     run:
         count={}
         for rec in SeqIO.parse(open(input.otus), "fasta"):
             size = int(rec.id.rsplit("_",1)[-1])
             name = rec.id.split("|", 1)[0]
             count[name] = size
-        data = {}
+        data = {"$": []}
         for line in open(input.tax):
-            name, lin = line.strip().split("\t")
+            name, linStr = line.strip().split("\t")
+            lin = linStr.split(";")
+            if lin[0] == "unknown":
+                data["$"].append(count[name])
+                continue
+            here = data
+            for entry in lin:
+                try:
+                    here["$"].append(count[name])
+                except KeyError:
+                    here["$"] = [count[name]]
+                try:
+                    here = here[entry]
+                except KeyError:
+                    here[entry] = {}
+                    here = here[entry]
+            #add count for the last one
             try:
-                data[lin] += count[name]
+                here["$"].append(count[name])
             except KeyError:
-                data[lin] = count[name]
+                here["$"] = [count[name]]
+        
         with open(output[0], "w") as out:
-            for lin, number in data.items():
-                if lin == "unknown":
-                    out.write("%i\n" % (number))
-                else:
-                    out.write("%i\t%s\n" % (number, "\t".join(lin.split(";"))))
-            
+            out.write(json.dumps(data))
+
+#def recursiveWrite(out, stack, data):
+#    for key, value in data.items():
+#        stack.append(key)
+#        if type(value) == type([]):
+#            out.write("%s\t%s\n" % ("\t".join(stack), 
+#                                    ";".join([str(i) for i in value])))
+#        else:
+#            recursiveWrite(out, stack, value)
+#        stack.pop()
 
 def kronaAllInput(wildcards):
-    return ["krona/%s_all.krona.tsv" % s for s in samples]
+    return ["krona/%s_all.krona.json" % s for s in samples]
+
+rule kronaAllPrepStep2:
+    input:  kronaAllInput
+    output: "krona/All.krona.xml"
+    run:
+        data={}
+        for inFile in input:
+            sample = "_".join(inFile.split("_")[:2]).split("/")[-1]
+            data[sample] = json.load(open(inFile))
+        samples = list(data.keys())
+        samples.sort()
+        root = et.Element("krona")
+        #attribute list of the whole plot
+        attList = et.Element("attributes", {"magnitude":"reads"})
+        reads = et.Element("attribute", {"display":"# Reads"})
+        reads.text = "reads"
+        attList.append(reads)
+        otus = et.Element("attribute", {"display":"# OTUs"})
+        otus.text = "otus"
+        attList.append(otus)
+        root.append(attList)
+        #datasets
+        dsList = et.Element("datasets")
+        for sample in samples:
+            ds = et.Element("dataset")
+            ds.text = sample
+            dsList.append(ds)
+        root.append(dsList)
+        ring = et.Element("node", {"name": "root"})
+        for sample in samples:
+            buildWedgeXmlFromDict(data[sample], ring)
+        root.append(ring)
+        et.ElementTree(root).write(output[0], encoding="utf-8")
+
+
+#def recursiveRead(inString, data):
+#    head, rest = inString.split("\t", 1)
+#    if not "\t" in rest:
+#        data[head] = inString.split(";")
+#    else:
+#        if not head in data:
+#            data[head] = {}
+#        recursiveRead(rest, data[head])
 
 rule kronaAll:
-    input: kronaAllInput
+    input: "krona/All.krona.xml"
     output: "krona/All.krona.html"
     shell:
-        "%(ktImportText)s -o {output} {input}" % config
+        "%(ktImportXML)s -o {output} {input}" % config
 
 ################ helper functions ###################################
+
+def buildWedgeXmlFromDict(d, parent):
+    for key, value in d.items():
+        if key == "$":
+            reads = parent.find("reads")
+            if reads is None:
+                reads = et.Element("reads")
+                parent.append(reads)
+            readsVal = et.Element("val")
+            readsVal.text = str(sum(value))
+            reads.append(readsVal)
+            
+            otus = parent.find("otus")
+            if otus is None:
+                otus = et.Element("otus")
+                parent.append(otus)
+            otusVal = et.Element("val")
+            otusVal.text = str(len(value))
+            otus.append(otusVal)
+        else:
+            node = None
+            for child in parent.findall("node"):
+                if child.attrib["name"] == key:
+                    node = child
+            if node is None:
+                node = et.Element("node", {"name": key})
+                parent.append(node)
+            buildWedgeXmlFromDict(value, node)
 
 def mothurLCA(lineageStrings, stringency=1.0):
     lineage = []

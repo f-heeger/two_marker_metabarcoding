@@ -7,6 +7,7 @@
     "trimmomatic": "/home/heeger/bin/Trimmomatic-0.35/trimmomatic-0.35.jar",
     "pear": "/home/heeger/bin/PEAR/bin/pear-0.9.6-bin-64",
     "ktImportText": "ktImportText",
+    "ktImportXML": "ktImportXML",
     "swarm": "/home/heeger/bin/swarm/bin/swarm",
     "lambdaFolder": "/home/heeger/bin/lambda-v0.9.3-linux_x86-64/bin"
 }
