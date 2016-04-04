@@ -1,6 +1,5 @@
 {
     "fastqc" : "/home/heeger/bin/FastQC/fastqc",
-    "pandaseq": "pandaseq",
     "itsx" : "/home/heeger/bin/ITSx_1.0.11/ITSx",
     "mothur" : "/home/heeger/bin/Mothur.cen_64/mothur/mothur",
     "flexbar" : "/home/heeger/bin/flexbar_v2.5_beta/flexbar",

@@ -1,16 +1,17 @@
 import itertools
 import json
+import xml.etree.ElementTree as et
+import xml.dom.minidom as minidom
 
 from snakemake.utils import min_version
 from Bio import SeqIO
-import xml.etree.ElementTree as et
 
 min_version("3.5.4")
 
 configfile: "config.json"
 
 samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
-#samples =["A1_S1", "B1_S2"]
+#samples =["A1_S1", "B1_S2", "H5_S40", "A5_S33"]
 
 
 rule all:
@@ -19,75 +20,7 @@ rule all:
 
 ################ generate reference sequence for 5.8S ##########################
 
-rule db_getRfamFile:
-    output: "dbs/RF00002.seed.fasta"
-    shell:
-        "wget -O dbs/RF00002.seed.fasta \"http://rfam.xfam.org/family/RF00002/alignment?acc=RF00002&format=fasta&download=1\""
-        
-rule db_makeRfamDna:
-    input: "dbs/RF00002.seed.fasta"
-    output: "dbs/RF00002.seed.dna.fasta"
-    run:
-        with open(output[0], "w") as out:
-            for line in open(input[0]):
-                if line[0] == ">":
-                    out.write(line)
-                else:
-                    out.write(line.replace("U", "T"))
-
-rule db_getUniteFile:
-    output: "dbs/sh_general_release_s_31.01.2016.fasta"
-    shell:
-        "cd dbs;"\
-        "wget https://unite.ut.ee/sh_files/sh_general_release_s_31.01.2016.zip;"\
-        "unzip sh_general_release_s_31.01.2016.zip;"\
-        "rm sh_general_release_s_31.01.2016.zip"
-
-rule db_extract58S:
-    input: "dbs/sh_general_release_s_31.01.2016.fasta"
-    output: "dbs/sh_general_release_s_31.01.2016.5_8S.fasta"
-    shell:
-        "%(itsx)s -t . -i {input} -o dbs/sh_general_release_s_31.01.2016 --save_regions 5.8S --cpu 6 --graphical F" % config
-        
-rule db_mothur_uniq:
-    input: "dbs/sh_general_release_s_31.01.2016.5_8S.fasta"
-    output: "dbs/sh_general_release_s_31.01.2016.5_8S.unique.fasta", "dbs/sh_general_release_s_31.01.2016.5_8S.names"
-    shell:
-        "%(mothur)s \"#unique.seqs(fasta={input});\"" % config
-        
-rule db_mothur_align:
-    input: seqs="dbs/sh_general_release_s_31.01.2016.5_8S.unique.fasta", tmpl="dbs/RF00002.seed.dna.fasta"
-    output: "dbs/sh_general_release_s_31.01.2016.5_8S.unique.align", "dbs/sh_general_release_s_31.01.2016.5_8S.unique.align.report", "dbs/sh_general_release_s_31.01.2016.5_8S.unique.flip.accnos"
-    shell:
-        "%(mothur)s \"#align.seqs(candidate={input.seqs}, template={input.tmpl}, flip=T);\"" % config
-        
-rule db_mothur_screen:
-    input: aln="dbs/sh_general_release_s_31.01.2016.5_8S.unique.align", names="dbs/sh_general_release_s_31.01.2016.5_8S.names"
-    output: "dbs/sh_general_release_s_31.01.2016.5_8S.unique.good.align", "dbs/sh_general_release_s_31.01.2016.5_8S.unique.bad.accnos", "dbs/sh_general_release_s_31.01.2016.5_8S.good.names"
-    shell:
-         "%(mothur)s \"#screen.seqs(fasta={input.aln}, name={input.names}, start=1, end=207, maxn=0, maxambig=0);\"" % config
-
-rule db_create_dbfiles:
-    input: aln="dbs/sh_general_release_s_31.01.2016.5_8S.unique.good.align", names="dbs/sh_general_release_s_31.01.2016.5_8S.good.names"
-    output: aln="dbs/UNITE.5_8S.aln", tax="dbs/UNITE.5_8S.tax"
-    run:
-        #get a consensus taxonomy for the entries in my alignment which are 
-        # collapsed from identic 5.8S sequences from different species
-        taxonomy = {}
-        with open(input.names, encoding="latin-1") as nameFile:
-            for line in nameFile:
-                rId, membersStr = line.split("\t")
-                lineage = []
-                members = membersStr.split(",")
-                taxonomy[rId] = mothurLCA([m.split("|")[4] for m in members])
-                    
-        with open(output.tax, "w") as tax, open(output.aln, "w") as aln:
-            for rec in SeqIO.parse(open(input.aln, encoding="latin-1"), "fasta"):
-                newId = "_".join(rec.id.split("|")[:4])
-                tax.write("%s\t%s;\n" % (newId, taxonomy[rec.id]))
-                rec.description=""
-                rec.id = newId
-                aln.write(rec.format("fasta"))
+include: "generate58SDatabase.snakefile.py
 
 ################ generate lamda db from UNTIE ##################################
 
@@ -100,13 +33,13 @@ rule db_creatUniteIndex:
 
 ################ quality control ###############################################
 
-rule concat:
+rule qc_concat:
     params: inFolder="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls"
     output: "QC/all_R{read_number}.fastq.gz"
     shell:
         "cat {params.inFolder}/*_L001_R{wildcards.read_number}_001.fastq.gz > {output}"
 
-rule fastqc:
+rule qc_fastqc:
     input: "QC/all_R{read_number}.fastq.gz"
     output: "QC/all_R{read_number}.html"
     threads: 6
@@ -115,14 +48,14 @@ rule fastqc:
 
 ################ initial sequence processing ###################################
 
-rule separatePrimer:
+rule init_separatePrimer:
     input: read1="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls/{sample}_L001_R1_001.fastq.gz", read2="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls/{sample}_L001_R2_001.fastq.gz"
     output: "demultiplexed/{sample}_barcode_ITS_1.fastq.gz", "demultiplexed/{sample}_barcode_ITS_2.fastq.gz", "demultiplexed/{sample}_barcode_other_1.fastq.gz", "demultiplexed/{sample}_barcode_other_2.fastq.gz"
     log: "logs/{sample}_flexbar.log"
     shell:
         "echo \">ITS\nCGATGAAGAACG\n>other\nACAAACT\" > barcodes/barcode_{wildcards.sample}.fasta; %(flexbar)s -n 4 -r {input.read1} -p {input.read2} -t demultiplexed/{wildcards.sample} -b barcodes/barcode_{wildcards.sample}.fasta -bk -be LEFT_TAIL -bn 20 -bt 1 -f i1.8 -u 100 -z GZ &> {log}" % config
 
-rule trimming:
+rule init_trimming:
     input: r1="demultiplexed/{sample}_barcode_ITS_1.fastq.gz", r2="demultiplexed/{sample}_barcode_ITS_2.fastq.gz"
     output: r1="trimmed/{sample}_trimmed_R1.fastq.gz", r2="trimmed/{sample}_trimmed_R2.fastq.gz"
     threads: 3
@@ -130,7 +63,7 @@ rule trimming:
     shell:
         "java -jar %(trimmomatic)s PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual}" % config
 
-rule merge:
+rule init_merge:
     input: r1="trimmed/{sample}_trimmed_R1.fastq.gz", r2="trimmed/{sample}_trimmed_R2.fastq.gz"
     output: "merged/{sample}.assembled.fastq"
     params: minLen=300, maxLen=550, minOverlap=10
@@ -139,7 +72,7 @@ rule merge:
     shell:
         "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/{wildcards.sample} -n {params.minLen} -m {params.maxLen} -v {params.minOverlap} &> {log}" % config
 
-rule convertMerged:
+rule init_convertMerged:
     input: "merged/{sample}.assembled.fastq"
     output: "merged/{sample}.fasta"
     run:
@@ -147,7 +80,7 @@ rule convertMerged:
             for record in SeqIO.parse(open(input[0]), "fastq"):
                 out.write(record.format("fasta"))
 
-rule itsx:
+rule init_itsx:
     input: "merged/{sample}.fasta"
     output: "itsx/{sample}.5_8S.fasta", "itsx/{sample}.ITS2.fasta", "itsx/{sample}.LSU.fasta", "itsx/{sample}.summary.txt", "itsx/{sample}.positions.txt"
     threads: 3
@@ -157,7 +90,7 @@ rule itsx:
 
 ################ 5.8S processing
 
-rule extract_58S:
+rule r58S_extract_58S:
     input: pos="itsx/{sample}.positions.txt", seq="merged/{sample}.fasta"
     output: fasta="mothur/{sample}.5_8S_extracted.fasta", gtf="itsx/{sample}.gtf"
     log: "logs/{sample}_5_8Sextraction.log"
@@ -194,28 +127,28 @@ rule extract_58S:
             logStream.write("ITSx found ITS too close to the start in %i sequences\n" % tooShort)
     
 
-rule goodReads_58S:
+rule r58S_goodReads:
     input: "mothur/{sample}.5_8S_extracted.fasta"
     output: "mothur/{sample}.5_8S_extracted.good.fasta"
     log: "logs/{sample}_mothur.log"
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}); screen.seqs(fasta={input}, maxambig=0, maxn=0);\" > /dev/null " % config
     
-rule uniqueReads_58S:
+rule r58S_uniqueReads:
     input: "mothur/{sample}.5_8S_extracted.good.fasta"
     output: "mothur/{sample}.5_8S_extracted.good.unique.fasta", "mothur/{sample}.5_8S_extracted.good.names"
     log: "logs/{sample}_mothur.log"
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); unique.seqs(fasta={input});\" > /dev/null" % config 
     
-rule nonSigletonReads_58S:
+rule r58S_nonSigletonReads:
     input: fasta="mothur/{sample}.5_8S_extracted.good.unique.fasta", names="mothur/{sample}.5_8S_extracted.good.names"
     output:"mothur/{sample}.5_8S_extracted.good.unique.abund.fasta", "mothur/{sample}.5_8S_extracted.good.abund.names", "mothur/{sample}.5_8S_extracted.good.unique.rare.fasta", "mothur/{sample}.5_8S_extracted.good.rare.names"
     log: "logs/{sample}_mothur.log"
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); split.abund(fasta={input.fasta}, name={input.names}, cutoff=1);\" > /dev/null" % config
 
-rule align_58S:
+rule r58S_align:
     input: reads="mothur/{sample}.5_8S_extracted.good.unique.abund.fasta", db="dbs/UNITE.5_8S.aln"
     output: align="mothur/{sample}.5_8S_extracted.good.unique.abund.align", report="mothur/{sample}.5_8S_extracted.good.unique.abund.align.report"
     threads: 3
@@ -223,7 +156,7 @@ rule align_58S:
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); align.seqs(candidate={input.reads}, template={input.db}, processors={threads});\" > /dev/null" % config
         
-rule classify_58S:
+rule r58S_classify:
     input: aln="mothur/{sample}.5_8S_extracted.good.unique.abund.align", names="mothur/{sample}.5_8S_extracted.good.abund.names", ref="dbs/UNITE.5_8S.aln", tax="dbs/UNITE.5_8S.tax"
     output: "mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.taxonomy", "mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.tax.summary"
     log: "logs/{sample}_mothur.log"
@@ -232,7 +165,7 @@ rule classify_58S:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); classify.seqs(fasta={input.aln}, name={input.names}, template={input.ref}, taxonomy={input.tax}, processors={threads}, cutoff={params.cutoff});\" > /dev/null" % config
 
 
-rule prepKronaFile_58S:
+rule r58S_prepKronaFile:
     input: tax="mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.taxonomy", name="mothur/{sample}.5_8S_extracted.good.abund.names"
     output: tab="krona/{sample}_5_8S.tsv"
     run:
@@ -265,45 +198,45 @@ rule prepKronaFile_58S:
             for key, value in data.items():
                 out.write("%i\t%s\n" % (value, key))
 
-def kronaInput(wildcards):
+def r58S_kronaInput(wildcards):
     return ["krona/%s_5_8S.tsv" %s for s in samples]
 
-rule krona_58S:
-    input: kronaInput
+rule r58S_krona:
+    input: r58S_kronaInput
     output: "krona/5_8s.krona.html"
     shell:
         "%(ktImportText)s -o {output} {input}" % config
 
 ################ ITS processing
 
-rule copyIts:
+rule its_copyIts:
     input: "itsx/{sample}.ITS2.fasta"
     output: "mothur/{sample}.ITS2.fasta"
     shell:
         "cp {input} {output}"
 
-rule goodReads_its:
+rule its_goodReads:
     input: "mothur/{sample}.ITS2.fasta"
     output: "mothur/{sample}.ITS2.good.fasta"
     log: "logs/{sample}_mothur_ITS.log"
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}); screen.seqs(fasta={input}, maxambig=0, maxn=0);\" > /dev/null" % config
         
-rule uniqueReads_its:
+rule its_uniqueReads:
     input: "mothur/{sample}.ITS2.good.fasta"
     output: "mothur/{sample}.ITS2.good.unique.fasta", "mothur/{sample}.ITS2.good.names"
     log: "logs/{sample}_mothur_ITS.log"
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); unique.seqs(fasta={input});\" > /dev/null" % config 
     
-rule nonSigletonReads_its:
+rule its_nonSigletonReads:
     input: fasta="mothur/{sample}.ITS2.good.unique.fasta", names="mothur/{sample}.ITS2.good.names"
     output:"mothur/{sample}.ITS2.good.unique.abund.fasta", "mothur/{sample}.ITS2.good.abund.names", "mothur/{sample}.ITS2.good.unique.rare.fasta", "mothur/{sample}.ITS2.good.rare.names"
     log: "logs/{sample}_mothur_ITS.log"
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); split.abund(fasta={input.fasta}, name={input.names}, cutoff=1);\" > /dev/null" % config
 
-rule prepForClustering_its:
+rule its_prepForClustering:
     input: seq="mothur/{sample}.ITS2.good.unique.abund.fasta", abund="mothur/{sample}.ITS2.good.abund.names"
     output: "swarm/{sample}.ITS2.input.fasta"
     run:
@@ -316,7 +249,7 @@ rule prepForClustering_its:
                 rec.id = "%s_%i" % (rec.id, abund[rec.id])
                 out.write(rec.format("fasta"))
 
-rule clustering_its:
+rule its_clustering:
     input: "swarm/{sample}.ITS2.input.fasta"
     output: seeds="swarm/{sample}.ITS2.otus.fasta", otuList="swarm/{sample}.ITS2.otus.out"
     log: "logs/{sample}_swarm.log"
@@ -324,7 +257,7 @@ rule clustering_its:
     shell:
         "%(swarm)s -f -t {threads} -w {output.seeds} {input} -o {output.otuList} &> {log}" % config
 
-rule get58sClassifications_its:
+rule its_get58sClassifications:
     input: its="swarm/{sample}.ITS2.otus.out", tax="mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.taxonomy", name="mothur/{sample}.5_8S_extracted.good.abund.names"
     output: "taxonomy/{sample}_ITS2.otus_5.8sClass.tsv"
     params: stringency=1.0
@@ -359,7 +292,7 @@ rule get58sClassifications_its:
                     out.write("%s\tunknown\t0\n" % (name))
         
 
-rule compareToUnite_its:
+rule its_alignToUnite:
     input: otus="swarm/{sample}.ITS2.otus.fasta", db="dbs/sh_general_release_s_31.01.2016.fasta", dbFlag="dbs/sh_general_release_s_31.01.2016.fasta.lambdaIndexCreated"
     output: "lambda/{sample}.ITS2.otus_vs_UNITE.m8"
     log: "logs/{sample}_lambda.log"
@@ -367,10 +300,10 @@ rule compareToUnite_its:
     shell:
         "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
 
-rule classify_its:
+rule its_classify:
     input: lam="lambda/{sample}.ITS2.otus_vs_UNITE.m8", otus="swarm/{sample}.ITS2.otus.fasta"
     output: "taxonomy/{sample}.ITS2.otus.class.tsv"
-    params: maxE=1e-6, topPerc=5.0
+    params: maxE=1e-6, topPerc=5.0, minIdent=90.0
     run:
         #FIXME: ATTENTION! This is just quick and dirty classification by top 10% rule
         classifi = {}
@@ -379,7 +312,7 @@ rule classify_its:
         for line in open(input.lam, encoding="latin-1"):
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
             readId = qseqid.split("|",1)[0]
-            if float(evalue) > params.maxE:
+            if float(evalue) > params.maxE or float(pident) < params.minIdent:
                 continue
             linStr = sseqid.rsplit("|", 1)[-1]
             classifi[readId].append((linStr, float(bitscore)))
@@ -396,7 +329,7 @@ rule classify_its:
                     lineage = mothurLCA([hit[0] for hit in sortedHits[:cutoff]])
                     out.write("%s\t%s\n" % (key, lineage))
 
-rule kronaPrep_its:
+rule its_kronaPrep:
     input: tax="taxonomy/{sample}.ITS2.otus.class.tsv", otus="swarm/{sample}.ITS2.otus.fasta"
     output: "krona/{sample}.ITS2.otus.krona.tsv"
     run:
@@ -419,16 +352,16 @@ rule kronaPrep_its:
                 else:
                     out.write("%i\t%s\n" % (number, "\t".join(lin.split(";"))))
 
-def kronaItsInput(wildcards):
+def its_kronaInput(wildcards):
     return ["krona/%s.ITS2.otus.krona.tsv" % s for s in samples]
 
-rule krona_its:
-    input: kronaItsInput
+rule its_krona:
+    input: its_kronaInput
     output: "krona/ITS2.krona.html"
     shell:
         "%(ktImportText)s -o {output} {input}" % config
 
-rule combineClassification:
+rule final_combineClassification:
     input: its="taxonomy/{sample}.ITS2.otus.class.tsv", tsu="taxonomy/{sample}_ITS2.otus_5.8sClass.tsv"
     output: "taxonomy/{sample}.ITS2.otus.combClass.tsv", "taxonomy/{sample}.ITS2.otus.conflictingClass.tsv"
     run:
@@ -470,7 +403,7 @@ rule combineClassification:
             for conf, number in conflict.items():
                 out.write("%s | %s\t%i\n" % (conf[0], conf[1], number))
 
-rule kronaAllPrepStep1:
+rule final_kronaPrepStep1:
     input: tax="taxonomy/{sample}.ITS2.otus.combClass.tsv", otus="swarm/{sample}.ITS2.otus.fasta"
     output: "krona/{sample}_all.krona.json"
     run:
@@ -516,10 +449,10 @@ rule kronaAllPrepStep1:
 #            recursiveWrite(out, stack, value)
 #        stack.pop()
 
-def kronaAllInput(wildcards):
+def final_kronaInput(wildcards):
     return ["krona/%s_all.krona.json" % s for s in samples]
 
-rule kronaAllPrepStep2:
+rule final_kronaPrepStep2:
     input:  kronaAllInput
     output: "krona/All.krona.xml"
     run:
@@ -529,28 +462,26 @@ rule kronaAllPrepStep2:
             data[sample] = json.load(open(inFile))
         samples = list(data.keys())
         samples.sort()
-        root = et.Element("krona")
-        #attribute list of the whole plot
-        attList = et.Element("attributes", {"magnitude":"reads"})
-        reads = et.Element("attribute", {"display":"# Reads"})
-        reads.text = "reads"
-        attList.append(reads)
-        otus = et.Element("attribute", {"display":"# OTUs"})
-        otus.text = "otus"
-        attList.append(otus)
-        root.append(attList)
-        #datasets
-        dsList = et.Element("datasets")
+        #create tree
+        tree = TaxTreeNode("root")
+        for s in samples:
+            tree.loadSubTree(data[s], s)
+        lines = []
+        lines.append("<krona>")
+        lines.append('    <attributes magnitude="reads">')
+        lines.append('        <attribute display="# Reads">reads</attribute>')
+        lines.append('        <attribute display="# OTUs">otus</attribute>')
+        lines.append('    </attributes>')
+        lines.append('    <datasets>')
         for sample in samples:
-            ds = et.Element("dataset")
-            ds.text = sample
-            dsList.append(ds)
-        root.append(dsList)
-        ring = et.Element("node", {"name": "root"})
-        for sample in samples:
-            buildWedgeXmlFromDict(data[sample], ring)
-        root.append(ring)
-        et.ElementTree(root).write(output[0], encoding="utf-8")
+            lines.append('        <dataset>%s</dataset>' % sample)
+        lines.append('    </datasets>')
+        lines.append('    <node name="root">')
+        lines.extend(tree.kronaXml(samples, "        "))
+        lines.append('    </node>')
+        lines.append('</krona>')
+        with open(output[0], "w", encoding="utf-8") as out:
+            out.write("\n".join(lines))
 
 
 #def recursiveRead(inString, data):
@@ -562,7 +493,7 @@ rule kronaAllPrepStep2:
 #            data[head] = {}
 #        recursiveRead(rest, data[head])
 
-rule kronaAll:
+rule final_kronaAll:
     input: "krona/All.krona.xml"
     output: "krona/All.krona.html"
     shell:
@@ -570,33 +501,49 @@ rule kronaAll:
 
 ################ helper functions ###################################
 
-def buildWedgeXmlFromDict(d, parent):
-    for key, value in d.items():
-        if key == "$":
-            reads = parent.find("reads")
-            if reads is None:
-                reads = et.Element("reads")
-                parent.append(reads)
-            readsVal = et.Element("val")
-            readsVal.text = str(sum(value))
-            reads.append(readsVal)
+class TaxTreeNode(object):
+    def __init__(self, name):
+        self.name = name
+        self.children = {}
+        self.reads = {}
+        self.otus = {}
+        
+    def loadSubTree(self, inDict, sample):
+        for key, value in inDict.items():
+            if key == "$":
+                try:
+                    self.reads[sample] += sum(value)
+                except KeyError:
+                    self.reads[sample] = sum(value)
+                try:
+                    self.otus[sample] += len(value)
+                except KeyError:
+                    self.otus[sample] = len(value)
+            else:
+                if key not in self.children:
+                    newChild = TaxTreeNode(key)
+                    self.children[key] = newChild
+                self.children[key].loadSubTree(value, sample)
+    
             
-            otus = parent.find("otus")
-            if otus is None:
-                otus = et.Element("otus")
-                parent.append(otus)
-            otusVal = et.Element("val")
-            otusVal.text = str(len(value))
-            otus.append(otusVal)
-        else:
-            node = None
-            for child in parent.findall("node"):
-                if child.attrib["name"] == key:
-                    node = child
-            if node is None:
-                node = et.Element("node", {"name": key})
-                parent.append(node)
-            buildWedgeXmlFromDict(value, node)
+    def kronaXml(self, order, indent=""):
+        lines=[]
+        lines.append('%s<reads>' % indent)
+        for sample in order:
+            lines.append('%s    <val sample="%s">%i</val>' % (indent, sample, 
+                                                              self.reads.get(sample, 0)))
+        lines.append('%s</reads>' % indent)
+        lines.append('%s<otus>' % indent)
+        for sample in order:
+            lines.append('%s    <val sample="%s">%i</val>' % (indent, sample, 
+                                                              self.otus.get(sample, 0)))
+        lines.append('%s</otus>' % indent)
+        for name, child in self.children.items():
+            lines.append('%s<node name="%s">' % (indent, name.split(";")[-1]))
+            lines.extend(child.kronaXml(order, indent+"    "))
+            lines.append('%s</node>' % indent)
+        return lines
+
 
 def mothurLCA(lineageStrings, stringency=1.0):
     lineage = []
