@@ -10,6 +10,8 @@ min_version("3.5.4")
 
 configfile: "config.json"
 
+shell.prefix("sleep 60; ") #work aorund to desl with "too quck" rule execution and slow NAS
+
 samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
 #samples =["A1_S1", "B1_S2", "H5_S40", "A5_S33"]
 
@@ -20,7 +22,7 @@ rule all:
 
 ################ generate reference sequence for 5.8S ##########################
 
-include: "generate58SDatabase.snakefile.py
+include: "generate58SDatabase.snakefile.py"
 
 ################ generate lamda db from UNTIE ##################################
 
@@ -80,8 +82,35 @@ rule init_convertMerged:
             for record in SeqIO.parse(open(input[0]), "fastq"):
                 out.write(record.format("fasta"))
 
-rule init_itsx:
+rule init_dereplicate:
     input: "merged/{sample}.fasta"
+    output: "merged/{sample}.unique.fasta", "merged/{sample}.names"
+    log: "logs/{sample}_mothur.log"
+    shell:
+        "%(mothur)s -q \"#set.logfile(name={log}, append=T); unique.seqs(fasta={input});\" > /dev/null" % config
+
+rule init_cpMergerd:
+    input:  seq="merged/{sample}.unique.fasta", name="merged/{sample}.names"
+    output:  seq="chimera/{sample}.unique.fasta", name="chimera/{sample}.names"
+    shell:
+        "cp {input.seq} {output.seq}; cp {input.name} {output.name}"
+
+rule init_removeChimeras:
+    input: seq="chimera/{sample}.unique.fasta", name="chimera/{sample}.names"
+    output: chimeras="chimera/{sample}.unique.uchime.accnos", fasta="chimera/{sample}.unique.pick.fasta", name="chimera/{sample}.pick.names"
+    log: "logs/{sample}_mothur.log"
+    shell: 
+        "%(mothur)s -q \"#set.logfile(name={log}, append=T); chimera.uchime(fasta={input.seq}, reference=self, name={input.name}); remove.seqs(fasta={input.seq}, accnos={output.chimeras}, name={input.name});\" 2> /dev/null" % config
+
+rule init_undereplicate:
+    input: fasta="chimera/{sample}.unique.pick.fasta", name="chimera/{sample}.pick.names"
+    output: fasta="chimera/{sample}.unique.pick.redundant.fasta"
+    log: "logs/{sample}_mothur.log"
+    shell: 
+        "%(mothur)s -q \"#set.logfile(name={log}, append=T); deunique.seqs(fasta={input.fasta}, name={input.name});\" > /dev/null" % config
+
+rule init_itsx:
+    input: "chimera/{sample}.unique.pick.redundant.fasta"
     output: "itsx/{sample}.5_8S.fasta", "itsx/{sample}.ITS2.fasta", "itsx/{sample}.LSU.fasta", "itsx/{sample}.summary.txt", "itsx/{sample}.positions.txt"
     threads: 3
     log: "logs/{sample}_itsx.log"
@@ -91,7 +120,7 @@ rule init_itsx:
 ################ 5.8S processing
 
 rule r58S_extract_58S:
-    input: pos="itsx/{sample}.positions.txt", seq="merged/{sample}.fasta"
+    input: pos="itsx/{sample}.positions.txt", seq="chimera/{sample}.unique.pick.redundant.fasta"
     output: fasta="mothur/{sample}.5_8S_extracted.fasta", gtf="itsx/{sample}.gtf"
     log: "logs/{sample}_5_8Sextraction.log"
     params: minLen=75
@@ -439,21 +468,11 @@ rule final_kronaPrepStep1:
         with open(output[0], "w") as out:
             out.write(json.dumps(data))
 
-#def recursiveWrite(out, stack, data):
-#    for key, value in data.items():
-#        stack.append(key)
-#        if type(value) == type([]):
-#            out.write("%s\t%s\n" % ("\t".join(stack), 
-#                                    ";".join([str(i) for i in value])))
-#        else:
-#            recursiveWrite(out, stack, value)
-#        stack.pop()
-
 def final_kronaInput(wildcards):
     return ["krona/%s_all.krona.json" % s for s in samples]
 
 rule final_kronaPrepStep2:
-    input:  kronaAllInput
+    input:  final_kronaInput
     output: "krona/All.krona.xml"
     run:
         data={}
@@ -482,16 +501,6 @@ rule final_kronaPrepStep2:
         lines.append('</krona>')
         with open(output[0], "w", encoding="utf-8") as out:
             out.write("\n".join(lines))
-
-
-#def recursiveRead(inString, data):
-#    head, rest = inString.split("\t", 1)
-#    if not "\t" in rest:
-#        data[head] = inString.split(";")
-#    else:
-#        if not head in data:
-#            data[head] = {}
-#        recursiveRead(rest, data[head])
 
 rule final_kronaAll:
     input: "krona/All.krona.xml"
