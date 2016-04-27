@@ -30,8 +30,9 @@ rule db_getUniteFile:
 rule db_extract58S:
     input: "dbs/sh_general_release_s_31.01.2016.fasta"
     output: "dbs/sh_general_release_s_31.01.2016.5_8S.fasta"
+    threads: 6
     shell:
-        "%(itsx)s -t . -i {input} -o dbs/sh_general_release_s_31.01.2016 --save_regions 5.8S --cpu 6 --graphical F" % config
+        "%(itsx)s -t . -i {input} -o dbs/sh_general_release_s_31.01.2016 --save_regions 5.8S --cpu {threads} --graphical F" % config
         
 rule db_mothur_uniq:
     input: "dbs/sh_general_release_s_31.01.2016.5_8S.fasta"
@@ -72,3 +73,37 @@ rule db_create_dbfiles:
                 rec.description=""
                 rec.id = newId
                 aln.write(rec.format("fasta"))
+                
+def mothurLCA(lineageStrings, stringency=1.0):
+    lineage = []
+    mLineages = []
+    #remove bootstrap values ("(100)", "(75)", etc.) if any
+    for mLin in [l.strip(";").split(";") for l in lineageStrings]:
+        mLineages.append([])
+        for entry in mLin:
+             mLineages[-1].append(entry.split("(")[0])
+    i=0
+    minLinLen = min([len(m) for m in mLineages])
+    while i<minLinLen:
+        tLin = None # <- this will save the first non "unknown" entry in this lineage level
+        different = 0.0
+        total = 0.0
+        for memberLin in mLineages:
+            if memberLin[i].split("__")[-1] in ["unidentified", "unclassified", "unknown"]:
+                # ignoring unidentified entrys
+                continue
+            total += 1
+            if tLin is None:
+                tLin = memberLin[i] # if we have not seen a non "unknown" entry at this level, this becomes our reference
+            else:
+                if memberLin[i] != tLin:
+                    different += 1
+        #accept the lineage entry if its proportion of all (valid) classifications higher than stringency setting
+        if not tLin is None and different/total <= (1.0-stringency):
+            lineage.append(tLin)
+        else:
+            break
+        i += 1
+    if len(lineage) == 0:
+        lineage = ["unknown"]
+    return ";".join(lineage)
