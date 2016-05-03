@@ -1,16 +1,17 @@
 import itertools
 import json
 import xml.etree.ElementTree as et
-import xml.dom.minidom as minidom
+#import xml.dom.minidom as minidom
+import gzip
 
-from snakemake.utils import min_version
+from snakemake.utils import min_version, R
 from Bio import SeqIO
 
 min_version("3.5.4")
 
 configfile: "config.json"
 
-shell.prefix("sleep 60; ") #work aorund to desl with "too quck" rule execution and slow NAS
+shell.prefix("sleep 30; ") #work aorund to desl with "too quck" rule execution and slow NAS
 
 samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
 #samples =["A1_S1", "B1_S2", "H5_S40", "A5_S33"]
@@ -57,6 +58,18 @@ rule init_separatePrimer:
     shell:
         "echo \">ITS\nCGATGAAGAACG\n>other\nACAAACT\" > barcodes/barcode_{wildcards.sample}.fasta; %(flexbar)s -n 4 -r {input.read1} -p {input.read2} -t demultiplexed/{wildcards.sample} -b barcodes/barcode_{wildcards.sample}.fasta -bk -be LEFT_TAIL -bn 20 -bt 1 -f i1.8 -u 100 -z GZ &> {log}" % config
 
+rule init_primerReadNumbers:
+    input: expand(["demultiplexed/{sample}_barcode_ITS_1.fastq.gz"], sample=samples)
+    output: "primerReadNumbers.tsv"
+    run:
+        with open(output[0], "w") as out:
+            for inFile in input:
+                rn = 0
+                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
+                    rn +=1
+                sample = inFile.split("_barcode_")[0].split("/")[-1]
+                out.write("%s\t%i\n" % (sample, rn))
+
 rule init_trimming:
     input: r1="demultiplexed/{sample}_barcode_ITS_1.fastq.gz", r2="demultiplexed/{sample}_barcode_ITS_2.fastq.gz"
     output: r1="trimmed/{sample}_trimmed_R1.fastq.gz", r2="trimmed/{sample}_trimmed_R2.fastq.gz"
@@ -64,6 +77,32 @@ rule init_trimming:
     params: windowLen=8, minQual=20, minLen=200, avgQual=30
     shell:
         "java -jar %(trimmomatic)s PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual}" % config
+
+rule init_trimmStats:
+    input: "logs/{sample}_trimmomatic.log"
+    output: "logs/{sample}_trimmStats.pdf"
+    run:
+        R("""
+        library(ggplot2)
+        d = read.table("{input}", header=F)
+        colnames(d) = c("seqName", "read", "len", "firstBase", "lastBase", "trimmed")
+        d$readNr = matrix(unlist(strsplit(as.character(d$read), ":")), ncol=4, byrow=T)[,1]
+        
+        ggplot(d) + geom_histogram(aes(len, fill=readNr), position="dodge", binwidth=5)
+        ggsave("{output}")
+        """)
+        
+rule init_trimmedReadNumbers:
+    input: expand(["trimmed/{sample}_trimmed_R1.fastq.gz"], sample=samples)
+    output: "trimmedReadNumbers.tsv"
+    run:
+        with open(output[0], "w") as out:
+            for inFile in input:
+                rn = 0
+                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
+                    rn +=1
+                sample = inFile.split("_trimmed_")[0].split("/")[-1]
+                out.write("%s\t%i\n" % (sample, rn))
 
 rule init_merge:
     input: r1="trimmed/{sample}_trimmed_R1.fastq.gz", r2="trimmed/{sample}_trimmed_R2.fastq.gz"
@@ -81,6 +120,39 @@ rule init_convertMerged:
         with open(output[0], "w") as out:
             for record in SeqIO.parse(open(input[0]), "fastq"):
                 out.write(record.format("fasta"))
+
+rule init_mergedReadNumbers:
+    input: expand(["merged/{sample}.fasta"], sample=samples)
+    output: "mergedReadNumbers.tsv"
+    run:
+        with open(output[0], "w") as out:
+            for inFile in input:
+                rn = 0
+                for seq in SeqIO.parse(open(inFile), "fasta"):
+                    rn +=1
+                sample = inFile.split(".")[0].split("/")[-1]
+                out.write("%s\t%i\n" % (sample, rn))
+
+rule init_readNumberOverview:
+    input: primer="primerReadNumbers.tsv", trimmed="trimmedReadNumbers.tsv", merged="mergedReadNumbers.tsv"
+    output: "readNumbers.pdf"
+    run:
+        R("""
+        library(ggplot2)
+        primer = read.table("{input.primer}", header=F)
+        primer$stage = "primerFound"
+        d = primer
+        trimmed = read.table("{input.trimmed}", header=F)
+        trimmed$stage = "trimmed"
+        d=rbind(d, trimmed)
+        merged = read.table("{input.merged}", header=F)
+        merged$stage = "merged"
+        d=rbind(d,merged)
+        colnames(d) = c("sample", "readNum", "stage")
+        d$stage = factor(d$stage, levels=c("merged", "trimmed", "primerFound"))
+        ggplot(d) + geom_bar(aes(sample, readNum, fill=stage), stat="identity", position="dodge") + coord_flip() + geom_hline(yintercept = 20000, linetype="dashed")
+        ggsave("{output}", width=7, height=28, units="in")
+        """)
 
 rule init_dereplicate:
     input: "merged/{sample}.fasta"
