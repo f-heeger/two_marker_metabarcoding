@@ -8,5 +8,9 @@
     "ktImportText": "ktImportText",
     "ktImportXML": "ktImportXML",
     "swarm": "/home/heeger/bin/swarm/bin/swarm",
-    "lambdaFolder": "/home/heeger/bin/lambda-v0.9.3-linux_x86-64/bin"
+    "lambdaFolder": "/home/heeger/bin/lambda-v0.9.3-linux_x86-64/bin",
+    "samples": {"A1_S1": "A1_S1",
+                "B1_S2": "B1_S2",
+                "H5_S40": "H5_S40",
+                "A5_S33": "A5_S33"}
 }

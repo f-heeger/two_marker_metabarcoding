@@ -13,9 +13,10 @@ configfile: "config.json"
 
 shell.prefix("sleep 30; ") #work aorund to desl with "too quck" rule execution and slow NAS
 
-samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
+#samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
 #samples =["A1_S1", "B1_S2", "H5_S40", "A5_S33"]
 
+samples = config["samples"].keys()
 
 rule all:
     input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html"
