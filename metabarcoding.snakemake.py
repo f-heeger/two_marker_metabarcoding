@@ -1,8 +1,8 @@
 import itertools
 import json
 import xml.etree.ElementTree as et
-#import xml.dom.minidom as minidom
 import gzip
+import glob
 
 from snakemake.utils import min_version, R
 from Bio import SeqIO
@@ -11,15 +11,14 @@ min_version("3.5.4")
 
 configfile: "config.json"
 
-shell.prefix("sleep 30; ") #work aorund to desl with "too quck" rule execution and slow NAS
+shell.prefix("sleep 10; ") #work aorund to desl with "too quck" rule execution and slow NAS
 
-#samples = ["%s%s_S%i" % (a,b,c) for ((b, a), c) in zip(itertools.product(range(1,13), "ABCDEFGH"), range(1,97))]
-#samples =["A1_S1", "B1_S2", "H5_S40", "A5_S33"]
+#samples =  {"A1_S1": "A1_S1", "B1_S2": "B1_S2", "H5_S40": "H5_S40", "A5_S33": "A5_S33"}
 
 samples = config["samples"].keys()
 
 rule all:
-    input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html"
+    input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv"
 #    input: "taxonomy/All.krona.html", "taxonomy/5_8s.krona.html", expand(["taxonomy/{sample}_ITS2.otus_5.8sClass.tsv", "taxonomy/{sample}.ITS2.otus.class.tsv"], sample=samples)
 
 ################ generate reference sequence for 5.8S ##########################
@@ -29,173 +28,198 @@ include: "generate58SDatabase.snakefile.py"
 ################ generate lamda db from UNTIE ##################################
 
 rule db_creatUniteIndex:
-    input: "dbs/sh_general_release_s_31.01.2016.fasta"
-    output: touch("dbs/sh_general_release_s_31.01.2016.fasta.lambdaIndexCreated")
+    input: "dbs/UNITE_public_31.01.2016.ascii.good.fasta"
+    output: touch("dbs/UNITE_public_31.01.2016.ascii.fasta.lambdaIndexCreated")
     threads: 6
     shell:
         "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
 
 ################ quality control ###############################################
 
-rule qc_concat:
+rule init_concat:
     params: inFolder="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls"
-    output: "QC/all_R{read_number}.fastq.gz"
-    shell:
-        "cat {params.inFolder}/*_L001_R{wildcards.read_number}_001.fastq.gz > {output}"
+    output: comb="raw/all_R{read_number}.fastq.gz", sample="readInfo/sample_R{read_number}.tsv", name="readInfo/name_R{read_number}.tsv"
+    run:
+        with gzip.open(output.comb, "wt") as combOut, \
+             open(output.sample, "w") as sampleOut, \
+             open(output.name, "w") as nameOut:
+            for sample in samples:
+                path = "%s/%s_L*_R%s_*.fastq.gz" % (params.inFolder, sample, wildcards.read_number)
+                inFiles=glob.glob(path)
+                if not inFiles:
+                    raise RuntimeError("No file(s) found for sample %s at %s." % (sample, path))
+                for inFile in inFiles:
+                    with gzip.open(inFile, "rt") as inStream:
+                        for rec in SeqIO.parse(inStream, "fastq"):
+                            newId = "_".join(rec.id.split(":")[3:])
+                            nameOut.write("%s\t%s\n" % (rec.id, newId))
+                            rec.id = newId
+                            combOut.write(rec.format("fastq"))
+                            sampleOut.write("%s\t%s\n" % (newId, sample))
 
 rule qc_fastqc:
-    input: "QC/all_R{read_number}.fastq.gz"
-    output: "QC/all_R{read_number}.html"
+    input: "/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls/{sample}_L001_R{read_number}_001.fastq.gz"
+    output: "QC/{sample}_L001_R{read_number}_001_fastqc.zip"
     threads: 6
     shell:
         "%(fastqc)s --nogroup -o QC --threads {threads} {input}" % config
 
-################ initial sequence processing ###################################
+def qc_multiqc_input(wildcards):
+    return ["QC/%s_L001_R%s_001_fastqc.zip" % (s,r) for s,r in itertools.product(samples, ["1","2"])]
 
-rule init_separatePrimer:
-    input: read1="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls/{sample}_L001_R1_001.fastq.gz", read2="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls/{sample}_L001_R2_001.fastq.gz"
-    output: "demultiplexed/{sample}_barcode_ITS_1.fastq.gz", "demultiplexed/{sample}_barcode_ITS_2.fastq.gz", "demultiplexed/{sample}_barcode_other_1.fastq.gz", "demultiplexed/{sample}_barcode_other_2.fastq.gz"
-    log: "logs/{sample}_flexbar.log"
+rule qc_multiqc:
+    input: qc_multiqc_input
+    output: "QC/multiqc_report.html"
     shell:
-        "echo \">ITS\nCGATGAAGAACG\n>other\nACAAACT\" > barcodes/barcode_{wildcards.sample}.fasta; %(flexbar)s -n 4 -r {input.read1} -p {input.read2} -t demultiplexed/{wildcards.sample} -b barcodes/barcode_{wildcards.sample}.fasta -bk -be LEFT_TAIL -bn 20 -bt 1 -f i1.8 -u 100 -z GZ &> {log}" % config
+        "%(multiqc)s --interactive -o QC QC/*_fastqc.zip" % config
 
-rule init_primerReadNumbers:
-    input: expand(["demultiplexed/{sample}_barcode_ITS_1.fastq.gz"], sample=samples)
-    output: "primerReadNumbers.tsv"
-    run:
-        with open(output[0], "w") as out:
-            for inFile in input:
-                rn = 0
-                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
-                    rn +=1
-                sample = inFile.split("_barcode_")[0].split("/")[-1]
-                out.write("%s\t%i\n" % (sample, rn))
+rule init_filterPrimer:
+    input: read1="raw/all_R1.fastq.gz", read2="raw/all_R2.fastq.gz"
+    output: "primers/all_barcode_ITS-ITS_1.fastq.gz", "primers/all_barcode_ITS-ITS_2.fastq.gz"
+    log: "logs/all_flexbar.log"
+    threads: 6
+    shell:
+        "echo \">ITS\n%(forward_primer)s\" > primers/fwd_primer.fasta; echo \">ITS\n%(reverse_primer)s\" > primers/rev_primer.fasta; %(flexbar)s -n {threads} -r {input.read1} -p {input.read2} -t primers/all -b primers/fwd_primer.fasta -b2 primers/rev_primer.fasta -bk -be LEFT_TAIL -bn 25 -bt 1.0 -f i1.8 -u 100 -z GZ &> {log}" % config
+
+#rule init_primerReadNumbers:
+#    input: expand(["demultiplexed/all_barcode_ITS_1.fastq.gz"], sample=samples)
+#    output: "primerReadNumbers.tsv"
+#    run:
+#        with open(output[0], "w") as out:
+#            for inFile in input:
+#                rn = 0
+#                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
+#                    rn +=1
+#                sample = inFile.split("_barcode_")[0].split("/")[-1]
+#                out.write("%s\t%i\n" % (sample, rn))
 
 rule init_trimming:
-    input: r1="demultiplexed/{sample}_barcode_ITS_1.fastq.gz", r2="demultiplexed/{sample}_barcode_ITS_2.fastq.gz"
-    output: r1="trimmed/{sample}_trimmed_R1.fastq.gz", r2="trimmed/{sample}_trimmed_R2.fastq.gz"
+    input: r1="primers/all_barcode_ITS-ITS_1.fastq.gz", r2="primers/all_barcode_ITS-ITS_2.fastq.gz"
+    output: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
     threads: 3
     params: windowLen=8, minQual=20, minLen=200, avgQual=30
     shell:
         "java -jar %(trimmomatic)s PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual}" % config
 
-rule init_trimmStats:
-    input: "logs/{sample}_trimmomatic.log"
-    output: "logs/{sample}_trimmStats.pdf"
-    run:
-        R("""
-        library(ggplot2)
-        d = read.table("{input}", header=F)
-        colnames(d) = c("seqName", "read", "len", "firstBase", "lastBase", "trimmed")
-        d$readNr = matrix(unlist(strsplit(as.character(d$read), ":")), ncol=4, byrow=T)[,1]
+#rule init_trimmStats:
+#    input: "logs/{sample}_trimmomatic.log"
+#    output: "logs/{sample}_trimmStats.pdf"
+#    run:
+#        R("""
+#        library(ggplot2)
+#        d = read.table("{input}", header=F)
+#        colnames(d) = c("seqName", "read", "len", "firstBase", "lastBase", "trimmed")
+#        d$readNr = matrix(unlist(strsplit(as.character(d$read), ":")), ncol=4, byrow=T)[,1]
+#        
+#        ggplot(d) + geom_histogram(aes(len, fill=readNr), position="dodge", binwidth=5)
+#        ggsave("{output}")
+#        """)
         
-        ggplot(d) + geom_histogram(aes(len, fill=readNr), position="dodge", binwidth=5)
-        ggsave("{output}")
-        """)
-        
-rule init_trimmedReadNumbers:
-    input: expand(["trimmed/{sample}_trimmed_R1.fastq.gz"], sample=samples)
-    output: "trimmedReadNumbers.tsv"
-    run:
-        with open(output[0], "w") as out:
-            for inFile in input:
-                rn = 0
-                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
-                    rn +=1
-                sample = inFile.split("_trimmed_")[0].split("/")[-1]
-                out.write("%s\t%i\n" % (sample, rn))
+#rule init_trimmedReadNumbers:
+#    input: expand(["trimmed/{sample}_trimmed_R1.fastq.gz"], sample=samples)
+#    output: "trimmedReadNumbers.tsv"
+#    run:
+#        with open(output[0], "w") as out:
+#            for inFile in input:
+#                rn = 0
+#                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
+#                    rn +=1
+#                sample = inFile.split("_trimmed_")[0].split("/")[-1]
+#                out.write("%s\t%i\n" % (sample, rn))
 
 rule init_merge:
-    input: r1="trimmed/{sample}_trimmed_R1.fastq.gz", r2="trimmed/{sample}_trimmed_R2.fastq.gz"
-    output: "merged/{sample}.assembled.fastq"
+    input: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
+    output: "merged/all.assembled.fastq"
     params: minLen=300, maxLen=550, minOverlap=10
     threads: 3
-    log: "logs/{sample}_pear.log"
+    log: "logs/all_pear.log"
     shell:
-        "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/{wildcards.sample} -n {params.minLen} -m {params.maxLen} -v {params.minOverlap} &> {log}" % config
+        "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n {params.minLen} -m {params.maxLen} -v {params.minOverlap} &> {log}" % config
 
 rule init_convertMerged:
-    input: "merged/{sample}.assembled.fastq"
-    output: "merged/{sample}.fasta"
+    input: "merged/all.assembled.fastq"
+    output: "merged/all.fasta"
     run:
         with open(output[0], "w") as out:
             for record in SeqIO.parse(open(input[0]), "fastq"):
                 out.write(record.format("fasta"))
 
-rule init_mergedReadNumbers:
-    input: expand(["merged/{sample}.fasta"], sample=samples)
-    output: "mergedReadNumbers.tsv"
-    run:
-        with open(output[0], "w") as out:
-            for inFile in input:
-                rn = 0
-                for seq in SeqIO.parse(open(inFile), "fasta"):
-                    rn +=1
-                sample = inFile.split(".")[0].split("/")[-1]
-                out.write("%s\t%i\n" % (sample, rn))
+#rule init_mergedReadNumbers:
+#    input: expand(["merged/{sample}.fasta"], sample=samples)
+#    output: "mergedReadNumbers.tsv"
+#    run:
+#        with open(output[0], "w") as out:
+#            for inFile in input:
+#                rn = 0
+#                for seq in SeqIO.parse(open(inFile), "fasta"):
+#                    rn +=1
+#                sample = inFile.split(".")[0].split("/")[-1]
+#                out.write("%s\t%i\n" % (sample, rn))
 
-rule init_readNumberOverview:
-    input: primer="primerReadNumbers.tsv", trimmed="trimmedReadNumbers.tsv", merged="mergedReadNumbers.tsv"
-    output: "readNumbers.pdf"
-    run:
-        R("""
-        library(ggplot2)
-        primer = read.table("{input.primer}", header=F)
-        primer$stage = "primerFound"
-        d = primer
-        trimmed = read.table("{input.trimmed}", header=F)
-        trimmed$stage = "trimmed"
-        d=rbind(d, trimmed)
-        merged = read.table("{input.merged}", header=F)
-        merged$stage = "merged"
-        d=rbind(d,merged)
-        colnames(d) = c("sample", "readNum", "stage")
-        d$stage = factor(d$stage, levels=c("merged", "trimmed", "primerFound"))
-        ggplot(d) + geom_bar(aes(sample, readNum, fill=stage), stat="identity", position="dodge") + coord_flip() + geom_hline(yintercept = 20000, linetype="dashed")
-        ggsave("{output}", width=7, height=28, units="in")
-        """)
+#rule init_readNumberOverview:
+#    input: primer="primerReadNumbers.tsv", trimmed="trimmedReadNumbers.tsv", merged="mergedReadNumbers.tsv"
+#    output: "readNumbers.pdf"
+#    run:
+#        R("""
+#        library(ggplot2)
+#        primer = read.table("{input.primer}", header=F)
+#        primer$stage = "primerFound"
+#        d = primer
+#        trimmed = read.table("{input.trimmed}", header=F)
+#        trimmed$stage = "trimmed"
+#        d=rbind(d, trimmed)
+#        merged = read.table("{input.merged}", header=F)
+#        merged$stage = "merged"
+#        d=rbind(d,merged)
+#        colnames(d) = c("sample", "readNum", "stage")
+#        d$stage = factor(d$stage, levels=c("merged", "trimmed", "primerFound"))
+#        ggplot(d) + geom_bar(aes(sample, readNum, fill=stage), stat="identity", position="dodge") + coord_flip() + geom_hline(yintercept = 20000, linetype="dashed")
+#        ggsave("{output}", width=7, height=28, units="in")
+#        """)
 
 rule init_dereplicate:
-    input: "merged/{sample}.fasta"
-    output: "merged/{sample}.unique.fasta", "merged/{sample}.names"
-    log: "logs/{sample}_mothur.log"
+    input: "merged/all.fasta"
+    output: fasta="init_derep/all.derep.fasta", tsv="readInfo/all.repseq.tsv", txt="init_derep/all.uc.txt"
+    log: "logs/all_rep58S.log"
+    run:
+        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizeout --log {log}" % config)
+        with open(output.tsv, "w") as out:
+            for line in open(output.txt):
+                arr = line.strip().split("\t")
+                if arr[0] == "C":
+                    pass
+                elif arr[0] == "S":
+                    seq = arr[-2]
+                    out.write("%s\t%s\n" % (seq, seq))
+                elif arr[0] == "H":
+                    seq, cluster = arr[-2:]
+                    out.write("%s\t%s\n" % (seq, cluster))
+                else:
+                    raise ValueError("Unknown record type: %s" % arr[0])
+                
+
+rule init_removeChimera:
+    input: "init_derep/all.derep.fasta"
+    output: fasta="chimera/all.nochimera.fasta", tsv="chimera/all.chimeraReport.tsv"
+    log: "logs/all_chimera.log"
     shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); unique.seqs(fasta={input});\" > /dev/null" % config
-
-rule init_cpMergerd:
-    input:  seq="merged/{sample}.unique.fasta", name="merged/{sample}.names"
-    output:  seq="chimera/{sample}.unique.fasta", name="chimera/{sample}.names"
-    shell:
-        "cp {input.seq} {output.seq}; cp {input.name} {output.name}"
-
-rule init_removeChimeras:
-    input: seq="chimera/{sample}.unique.fasta", name="chimera/{sample}.names"
-    output: chimeras="chimera/{sample}.unique.uchime.accnos", fasta="chimera/{sample}.unique.pick.fasta", name="chimera/{sample}.pick.names"
-    log: "logs/{sample}_mothur.log"
-    shell: 
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); chimera.uchime(fasta={input.seq}, reference=self, name={input.name}); remove.seqs(fasta={input.seq}, accnos={output.chimeras}, name={input.name});\" 2> /dev/null" % config
-
-rule init_undereplicate:
-    input: fasta="chimera/{sample}.unique.pick.fasta", name="chimera/{sample}.pick.names"
-    output: fasta="chimera/{sample}.unique.pick.redundant.fasta"
-    log: "logs/{sample}_mothur.log"
-    shell: 
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); deunique.seqs(fasta={input.fasta}, name={input.name});\" > /dev/null" % config
+        "%(vsearch)s --uchime_denovo {input} --nonchimeras {output.fasta} --uchimeout {output.tsv} --log {log}" % config
+    
 
 rule init_itsx:
-    input: "chimera/{sample}.unique.pick.redundant.fasta"
-    output: "itsx/{sample}.5_8S.fasta", "itsx/{sample}.ITS2.fasta", "itsx/{sample}.LSU.fasta", "itsx/{sample}.summary.txt", "itsx/{sample}.positions.txt"
-    threads: 3
-    log: "logs/{sample}_itsx.log"
+    input: "chimera/all.nochimera.fasta"
+    output: "itsx/all.5_8S.fasta", "itsx/all.ITS2.fasta", "itsx/all.LSU.fasta", "itsx/all.summary.txt", "itsx/all.positions.txt"
+    threads: 6
+    log: "logs/all_itsx.log"
     shell:
-        "%(itsx)s -t . -i {input} -o itsx/{wildcards.sample} --save_regions 5.8S,ITS2,LSU --complement F --cpu {threads} --graphical F --detailed_results T --partial 50 2> {log}" % config
+        "%(itsx)s -t . -i {input} -o itsx/all --save_regions 5.8S,ITS2,LSU --complement F --cpu {threads} --graphical F --detailed_results T --partial 50 2> {log}" % config
 
 ################ 5.8S processing
 
 rule r58S_extract_58S:
-    input: pos="itsx/{sample}.positions.txt", seq="chimera/{sample}.unique.pick.redundant.fasta"
-    output: fasta="mothur/{sample}.5_8S_extracted.fasta", gtf="itsx/{sample}.gtf"
-    log: "logs/{sample}_5_8Sextraction.log"
+    input: pos="itsx/all.positions.txt", seq="chimera/all.nochimera.fasta"
+    output: fasta="itsx/all.5_8S_extracted.fasta", gtf="itsx/all.gtf"
+    log: "logs/all_5_8Sextraction.log"
     params: minLen=75
     run:
         pos = {}
@@ -221,69 +245,103 @@ rule r58S_extract_58S:
                             elif start < params.minLen:
                                 tooShort +=1
                             else:
+                                oldId, size = rec.id.strip(";").split(";")
+                                rec.id = "%s|5.8S;%s;" % (oldId, size)
+                                rec.description="Extracted 5.8S sequence 0-%i" % (start-1)
                                 out.write(rec[0:start].format("fasta"))
         with open(log[0], "a") as logStream:
             logStream.write("-------- 5.8S Extraction --------\n")
             logStream.write("ITSx found nothing in %i sequences\n" % nothingFound)
             logStream.write("ITSx found no 5.8S (ITS2 starts at 0) in %i sequences\n" % no58s)
             logStream.write("ITSx found ITS too close to the start in %i sequences\n" % tooShort)
-    
 
-rule r58S_goodReads:
-    input: "mothur/{sample}.5_8S_extracted.fasta"
-    output: "mothur/{sample}.5_8S_extracted.good.fasta"
-    log: "logs/{sample}_mothur.log"
+
+rule r58S_removePrimerAndNs:
+    input: "itsx/all.5_8S_extracted.fasta"
+    output: "primerremoved/all.5_8S_primerRemoved.fasta"
+    log: "logs/all_58S_cutadapt.log"
+    params: minOverlap=10, maxN=1
     shell:
-        "%(mothur)s -q \"#set.logfile(name={log}); screen.seqs(fasta={input}, maxambig=0, maxn=0);\" > /dev/null " % config
-    
-rule r58S_uniqueReads:
-    input: "mothur/{sample}.5_8S_extracted.good.fasta"
-    output: "mothur/{sample}.5_8S_extracted.good.unique.fasta", "mothur/{sample}.5_8S_extracted.good.names"
-    log: "logs/{sample}_mothur.log"
-    shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); unique.seqs(fasta={input});\" > /dev/null" % config 
-    
-rule r58S_nonSigletonReads:
-    input: fasta="mothur/{sample}.5_8S_extracted.good.unique.fasta", names="mothur/{sample}.5_8S_extracted.good.names"
-    output:"mothur/{sample}.5_8S_extracted.good.unique.abund.fasta", "mothur/{sample}.5_8S_extracted.good.abund.names", "mothur/{sample}.5_8S_extracted.good.unique.rare.fasta", "mothur/{sample}.5_8S_extracted.good.rare.names"
-    log: "logs/{sample}_mothur.log"
-    shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); split.abund(fasta={input.fasta}, name={input.names}, cutoff=1);\" > /dev/null" % config
+        "%(cutadapt)s -g ^%(forward_primer)s --trimmed-only -O {params.minOverlap} --max-n={params.maxN} -o {output} {input} &> {log}" % config
+
+rule r58S_dereplicate:
+    """dereplicate 5.8S sequences and only retain "clusters" with more than one sequence"""
+    input: "primerremoved/all.5_8S_primerRemoved.fasta"
+    output: fasta="mothur/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
+    log: "logs/all_repSeq.log"
+    params: minsize=2
+    run:
+        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}" % config)
+        
+        seq2cluster = {}
+        clusterSize = {}
+        for line in open(output.txt):
+            arr = line.strip().split("\t")
+            if arr[0] == "C":
+                cluster = arr[-2].split(";")[0]
+                size = arr[2]
+                clusterSize[cluster] = int(size)
+            elif arr[0] == "S":
+                seq = arr[-2].split(";")[0]
+                seq2cluster[seq] = seq
+            elif arr[0] == "H":
+                seq, cluster = arr[-2:]
+                seq2cluster[seq.split(";")[0]] = cluster.split(";")[0]
+            else:
+                raise ValueError("Unknown record type: %s" % arr[0])
+            
+        with open(output.tsv, "w") as out:
+            for seq, cluster in seq2cluster.items():
+                if clusterSize[cluster] >= params.minsize:
+                    out.write("%s\t%s\n" % (seq, cluster))
 
 rule r58S_align:
-    input: reads="mothur/{sample}.5_8S_extracted.good.unique.abund.fasta", db="dbs/UNITE.5_8S.aln"
-    output: align="mothur/{sample}.5_8S_extracted.good.unique.abund.align", report="mothur/{sample}.5_8S_extracted.good.unique.abund.align.report"
+    input: reads="mothur/all.5_8S_derep.fasta", db="dbs/UNITE.5_8S.aln"
+    output: align="mothur/all.5_8S_derep.align", report="mothur/all.5_8S_derep.align.report"
     threads: 3
-    log: "logs/{sample}_mothur.log"
+    log: "logs/58S_mothur.log"
     shell:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); align.seqs(candidate={input.reads}, template={input.db}, processors={threads});\" > /dev/null" % config
         
 rule r58S_classify:
-    input: aln="mothur/{sample}.5_8S_extracted.good.unique.abund.align", names="mothur/{sample}.5_8S_extracted.good.abund.names", ref="dbs/UNITE.5_8S.aln", tax="dbs/UNITE.5_8S.tax"
-    output: "mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.taxonomy", "mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.tax.summary"
-    log: "logs/{sample}_mothur.log"
+    input: aln="mothur/all.5_8S_derep.align", ref="dbs/UNITE.5_8S.aln", tax="dbs/UNITE.5_8S.tax"
+    output: "mothur/all.5_8S_derep.5_8S.wang.taxonomy", "mothur/all.5_8S_derep.5_8S.wang.tax.summary"
+    log: "logs/58s_mothur.log"
     params: cutoff=60
     shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); classify.seqs(fasta={input.aln}, name={input.names}, template={input.ref}, taxonomy={input.tax}, processors={threads}, cutoff={params.cutoff});\" > /dev/null" % config
+        "%(mothur)s -q \"#set.logfile(name={log}, append=T); classify.seqs(fasta={input.aln}, template={input.ref}, taxonomy={input.tax}, processors={threads}, cutoff={params.cutoff});\" > /dev/null" % config
 
 
-rule r58S_prepKronaFile:
-    input: tax="mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.taxonomy", name="mothur/{sample}.5_8S_extracted.good.abund.names"
-    output: tab="krona/{sample}_5_8S.tsv"
+rule r58S_readClassification:
+    input: tax="mothur/all.5_8S_derep.5_8S.wang.taxonomy", repseq="readInfo/all.repseq.tsv", rep58s="readInfo/all.rep58S.tsv", sample="readInfo/sample_R1.tsv"
+    output: "taxonomy/all_5_8S_classification.tsv"
     run:
-        count = {}
-        for line in open(input.name):
-            rId, members = line.strip().split("\t")
-            count[rId] = len(members.split(","))
-        data = {}
+        repseq = {}
+        for line in open(input.repseq):
+            read, rep = line.strip().split("\t")
+            try:
+                repseq[rep].append(read)
+            except KeyError:
+                repseq[rep] = [read]
+        rep58s = {}
+        for line in open(input.rep58s):
+            seq, rep = line.strip().split("\t")
+            try:
+                rep58s[rep].append(seq)
+            except KeyError:
+                rep58s[rep] = [seq]
+            
+        readClass = {}
         for line in open(input.tax):
-            rId, classification = line.strip().split("\t")
-            key = []
+            rName, classification = line.strip().split("\t")
+            rId, sizeStr = rName.strip(";").split(";")
+            count = int(sizeStr.split("=")[1])
+            cls = []
             for entry in classification.strip(";").split(";"):
                 if entry == "unclassified":
                     break
                 elif entry == "unknown":
-                    key = [""]
+                    cls = [""]
                 else:
                     try:
                         name, _ = entry.split("(")
@@ -291,20 +349,52 @@ rule r58S_prepKronaFile:
                         print(entry)
                         print(line)
                         raise
-                    key.append(name)
-            try:
-                data["\t".join(key)] += count[rId]
-            except KeyError:
-                data["\t".join(key)] = count[rId]
-        with open(output.tab, "w") as out:
-            for key, value in data.items():
-                out.write("%i\t%s\n" % (value, key))
+                    cls.append(name)
+            i=0
+            for r58seq in rep58s[rId]:
+                for read in repseq[r58seq.split("|")[0]]:
+                    readClass[read] = ";".join(cls)
+                    i+=1
+            assert i==count
+        with open(output[0], "w") as out:
+            for read, cls in readClass.items():
+                out.write("%s\t%s\n" % (read, cls))
 
-def r58S_kronaInput(wildcards):
-    return ["krona/%s_5_8S.tsv" %s for s in samples]
+rule r58S_prepKronaInput:
+    input: cls="taxonomy/all_5_8S_classification.tsv", sample="readInfo/sample_R1.tsv"
+    output: expand("krona/{sample}_5_8S.tsv", sample=samples)
+    run:
+        sampleReads = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            try:
+                sampleReads[sample].append(read)
+            except KeyError:
+                sampleReads[sample] = [read]
+        readCls = {}
+        for line in open(input.cls):
+            read, cls = line.strip("\n").split("\t")
+            readCls[read] = cls
+        for outPath in output:
+            sample = outPath.split("/")[1][:-9]
+            with open(outPath, "w") as out:
+                clsCount = {}
+                for read in sampleReads[sample]:
+                    try:
+                        cls = readCls[read]
+                    except KeyError:
+                        pass
+                        #this are reads that were filtered out after the sample
+                        # file was created
+                    try:
+                        clsCount[cls] += 1
+                    except KeyError:
+                        clsCount[cls] = 1
+                for cls, count in clsCount.items():
+                    out.write("%i\t%s\n" % (count, "\t".join(cls.split(";"))))
 
 rule r58S_krona:
-    input: r58S_kronaInput
+    input: expand("krona/{sample}_5_8S.tsv", sample=samples)
     output: "krona/5_8s.krona.html"
     shell:
         "%(ktImportText)s -o {output} {input}" % config
@@ -312,112 +402,109 @@ rule r58S_krona:
 ################ ITS processing
 
 rule its_copyIts:
-    input: "itsx/{sample}.ITS2.fasta"
-    output: "mothur/{sample}.ITS2.fasta"
-    shell:
-        "cp {input} {output}"
-
-rule its_goodReads:
-    input: "mothur/{sample}.ITS2.fasta"
-    output: "mothur/{sample}.ITS2.good.fasta"
-    log: "logs/{sample}_mothur_ITS.log"
-    shell:
-        "%(mothur)s -q \"#set.logfile(name={log}); screen.seqs(fasta={input}, maxambig=0, maxn=0);\" > /dev/null" % config
-        
-rule its_uniqueReads:
-    input: "mothur/{sample}.ITS2.good.fasta"
-    output: "mothur/{sample}.ITS2.good.unique.fasta", "mothur/{sample}.ITS2.good.names"
-    log: "logs/{sample}_mothur_ITS.log"
-    shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); unique.seqs(fasta={input});\" > /dev/null" % config 
-    
-rule its_nonSigletonReads:
-    input: fasta="mothur/{sample}.ITS2.good.unique.fasta", names="mothur/{sample}.ITS2.good.names"
-    output:"mothur/{sample}.ITS2.good.unique.abund.fasta", "mothur/{sample}.ITS2.good.abund.names", "mothur/{sample}.ITS2.good.unique.rare.fasta", "mothur/{sample}.ITS2.good.rare.names"
-    log: "logs/{sample}_mothur_ITS.log"
-    shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); split.abund(fasta={input.fasta}, name={input.names}, cutoff=1);\" > /dev/null" % config
-
-rule its_prepForClustering:
-    input: seq="mothur/{sample}.ITS2.good.unique.abund.fasta", abund="mothur/{sample}.ITS2.good.abund.names"
-    output: "swarm/{sample}.ITS2.input.fasta"
+    input: "itsx/all.ITS2.fasta"
+    output: "itsx/all.ITS2_extracted.fasta"
     run:
-        abund={}
-        for line in open(input.abund):
-            rep, members = line.strip().split("\t")
-            abund[rep] = len(members.split(","))
         with open(output[0], "w") as out:
-            for rec in SeqIO.parse(open(input.seq), "fasta"):
-                rec.id = "%s_%i" % (rec.id, abund[rec.id])
+            for rec in SeqIO.parse(open(input[0]), "fasta"):
+                rId, sizeStr = rec.id.split("|")[0].strip(";").split(";")
+                rec.id = "%s|ITS2;%s;" % (rId, sizeStr)
                 out.write(rec.format("fasta"))
 
-rule its_clustering:
-    input: "swarm/{sample}.ITS2.input.fasta"
-    output: seeds="swarm/{sample}.ITS2.otus.fasta", otuList="swarm/{sample}.ITS2.otus.out"
-    log: "logs/{sample}_swarm.log"
-    threads: 3
-    shell:
-        "%(swarm)s -f -t {threads} -w {output.seeds} {input} -o {output.otuList} &> {log}" % config
-
-rule its_get58sClassifications:
-    input: its="swarm/{sample}.ITS2.otus.out", tax="mothur/{sample}.5_8S_extracted.good.unique.abund.5_8S.wang.taxonomy", name="mothur/{sample}.5_8S_extracted.good.abund.names"
-    output: "taxonomy/{sample}_ITS2.otus_5.8sClass.tsv"
-    params: stringency=1.0
+rule its_goodReads:
+    input: "itsx/all.ITS2_extracted.fasta"
+    output: "itsx/all.ITS2_extracted.good.fasta"
+    log: "logs/all_good_ITS.log"
     run:
         with open(output[0], "w") as out:
-            tsu2tax = {}
-            read2tsu = {}
-            for line in open(input.name):
-                rep, mem = line.strip().split("\t")
-                for m in mem.split(","):
-                    read2tsu[m] = rep
-            for line in open(input.tax):
-                seq, lineage = line.strip().split("\t")
-                tsu2tax[seq] = lineage  
-            for line in open(input.its):
-                members = [m.split("|",1)[0] for m in line.strip().split(" ")]
-                name = members[0]
-                rep58Sclass = []
-                for read in members:
-                    try:
-                         tsu = read2tsu[read]
-                    except KeyError:
-                        #some reads might have ITS but no 5.8S (eg. because of quality filtering)
-                        pass
-                    else:
-                        rep58Sclass.append(tsu2tax[tsu])
-                if rep58Sclass:
-                    lcaStr = mothurLCA(rep58Sclass, params.stringency)
-                    lcPhylum = ";".join(lcaStr.split(";")[:2]) #trim the lineage doen wot phylum (2. level)
-                    out.write("%s\t%s\t%i\n" % (name, lcPhylum, len(rep58Sclass)))
-                else:
-                    out.write("%s\tunknown\t0\n" % (name))
+            for rec in SeqIO.parse(open(input[0]), "fasta"):
+                if rec.seq.count("N") == 0:
+                    out.write(rec.format("fasta"))
+
+rule its_dereplicate:
+    input: "itsx/all.ITS2_extracted.good.fasta"
+    output: fasta="its_derep/all.ITS2_extracted.derep.fasta", tsv="readInfo/all.repITS2.tsv", txt="its_derep/all.uc.txt"
+    log: "logs/all_repIts.log"
+    params: minsize=2
+    run:
+        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}" % config)
         
+        seq2cluster = {}
+        clusterSize = {}
+        for line in open(output.txt):
+            arr = line.strip().split("\t")
+            if arr[0] == "C":
+                cluster = arr[-2].split(";")[0]
+                size = arr[2]
+                clusterSize[cluster] = int(size)
+            elif arr[0] == "S":
+                seq = arr[-2].split(";")[0]
+                seq2cluster[seq] = seq
+            elif arr[0] == "H":
+                seq, cluster = arr[-2:]
+                seq2cluster[seq.split(";")[0]] = cluster.split(";")[0]
+            else:
+                raise ValueError("Unknown record type: %s" % arr[0])
+            
+        with open(output.tsv, "w") as out:
+            for seq, cluster in seq2cluster.items():
+                if clusterSize[cluster] >= params.minsize:
+                    out.write("%s\t%s\n" % (seq, cluster))
+
+rule its_clustering:
+    input: "its_derep/all.ITS2_extracted.derep.fasta"
+    output: seeds="swarm/all.ITS2.otus.fasta", otuList="swarm/all.ITS2.otus.out"
+    log: "logs/all_swarm.log"
+    threads: 3
+    shell:
+        "%(swarm)s -f -z -t {threads} -w {output.seeds} {input} -o {output.otuList} &> {log}" % config
+
 
 rule its_alignToUnite:
-    input: otus="swarm/{sample}.ITS2.otus.fasta", db="dbs/sh_general_release_s_31.01.2016.fasta", dbFlag="dbs/sh_general_release_s_31.01.2016.fasta.lambdaIndexCreated"
-    output: "lambda/{sample}.ITS2.otus_vs_UNITE.m8"
-    log: "logs/{sample}_lambda.log"
+    input: otus="swarm/all.ITS2.otus.fasta", db="dbs/UNITE_public_31.01.2016.ascii.good.fasta", dbFlag="dbs/UNITE_public_31.01.2016.ascii.fasta.lambdaIndexCreated"
+    output: "lambda/all.ITS2.otus_vs_UNITE.m8"
+    log: "logs/all_lambda.log"
     threads: 3
     shell:
         "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
 
 rule its_classify:
-    input: lam="lambda/{sample}.ITS2.otus_vs_UNITE.m8", otus="swarm/{sample}.ITS2.otus.fasta"
-    output: "taxonomy/{sample}.ITS2.otus.class.tsv"
-    params: maxE=1e-6, topPerc=5.0, minIdent=90.0
+    input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta"
+    output: "taxonomy/all.ITS2.otus.class.tsv"
+    params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0
     run:
-        #FIXME: ATTENTION! This is just quick and dirty classification by top 10% rule
         classifi = {}
+        itsLength = {}
+        seqNr = 0
+        total = 0
+        evalueFilter = 0
+        identFilter = 0
+        covFilter = 0
         for rec in SeqIO.parse(open(input.otus), "fasta"):
-            classifi[rec.id.split("|",1)[0]] = []
+            seqNr += 1
+            classifi[rec.id] = []
+            itsLength[rec.id.split("|",1)[0]] = len(rec)
         for line in open(input.lam, encoding="latin-1"):
+            total +=1
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
             readId = qseqid.split("|",1)[0]
-            if float(evalue) > params.maxE or float(pident) < params.minIdent:
+            if float(evalue) > params.maxE:
+                evalueFilter += 1
+                continue
+            if float(pident) < params.minIdent:
+                identFilter +=1
+                continue
+            if float(length)/itsLength[readId]*100 < params.minCov:
+                covFilter += 1
                 continue
             linStr = sseqid.rsplit("|", 1)[-1]
-            classifi[readId].append((linStr, float(bitscore)))
+            if linStr.endswith("Incertae"):
+                linStr += "_sedis" #FIXME: workaroud for taking the tayonomy from the fasta header which ends at a space. Wither fix fasta headers or take taxonomy from UNITE taxonomy file
+            classifi[qseqid].append((linStr, float(bitscore)))
+        print("%i alignmetns for %i sequences" % (total, seqNr))
+        print("%i excluded, because e-value was higher than %e" % (evalueFilter, params.maxE))
+        print("%i excluded, because identity was lower than %d%%" % (identFilter, params.minIdent))
+        print("%i excluded, because coverage was lower than %d%%" % (evalueFilter, params.minCov))
         topPerc = params.topPerc/100.0
         with open(output[0], "w") as out:
             for key, hits in classifi.items():
@@ -428,53 +515,148 @@ rule its_classify:
                     cutoff = 0
                     while cutoff < len(sortedHits) and sortedHits[cutoff][1] >= (1.0-topPerc)*sortedHits[0][1]:
                         cutoff += 1
-                    lineage = mothurLCA([hit[0] for hit in sortedHits[:cutoff]])
+                    lineage = lca([hit[0] for hit in sortedHits[:cutoff]])
                     out.write("%s\t%s\n" % (key, lineage))
 
-rule its_kronaPrep:
-    input: tax="taxonomy/{sample}.ITS2.otus.class.tsv", otus="swarm/{sample}.ITS2.otus.fasta"
-    output: "krona/{sample}.ITS2.otus.krona.tsv"
+rule its_readClassification:
+    input: tax="taxonomy/all.ITS2.otus.class.tsv", otuList="swarm/all.ITS2.otus.out", repIts="readInfo/all.repITS2.tsv", repSeq="readInfo/all.repseq.tsv"
+    output: cls="taxonomy/all.ITS2.classification.tsv", otuReads="swarm/all.otuReads.tsv"
     run:
-        count={}
-        for rec in SeqIO.parse(open(input.otus), "fasta"):
-            size = int(rec.id.rsplit("_",1)[-1])
-            name = rec.id.split("|", 1)[0]
-            count[name] = size
-        data = {}
-        for line in open(input.tax):
-            name, lin = line.strip().split("\t")
+        repSeq = {}
+        for line in open(input.repSeq):
+            read, rep = line.strip().split("\t")
             try:
-                data[lin] += count[name]
+                repSeq[rep].append(read)
             except KeyError:
-                data[lin] = count[name]
-        with open(output[0], "w") as out:
-            for lin, number in data.items():
-                if lin == "unknown":
-                    out.write("%i\n" % (number))
-                else:
-                    out.write("%i\t%s\n" % (number, "\t".join(lin.split(";"))))
+                repSeq[rep] = [read]
+        repIts = {}
+        for line in open(input.repIts):
+            seq, rep = line.strip().split("\t")
+            try:
+                repIts[rep.split("|")[0]].append(seq.split("|")[0])
+            except KeyError:
+                repIts[rep.split("|")[0]] = [seq.split("|")[0]]
+        otu = {}
+        for line in open(input.otuList):
+            memSeqs = line.strip().split(" ")
+            otu[memSeqs[0].strip(";").split(";")[0]] = [s.split("|")[0] for s in memSeqs]
 
-def its_kronaInput(wildcards):
-    return ["krona/%s.ITS2.otus.krona.tsv" % s for s in samples]
+        readClass = {}
+        with open(output.otuReads, "w") as otuOut:
+            for line in open(input.tax):
+                otuName, classification = line.strip().split("\t")
+                otuId, sizeStr = otuName.strip(";").split(";")
+                count = int(sizeStr.split("=")[1])
+                cls = []
+                for entry in classification.strip(";").split(";"):
+                    if entry == "unclassified":
+                        break
+                    elif entry == "unknown":
+                        cls = [""]
+                    else:
+                        cls.append(entry)
+                i=0
+                for itsSeq in otu[otuId]:
+                    for repSeqId in repIts[itsSeq]:
+                        for read in repSeq[repSeqId]:
+                            readClass[read] = ";".join(cls)
+                            i+=1
+                            otuOut.write("%s\t%s\n" % (otuId, read))
+                assert i==count
+        
+        with open(output.cls, "w") as out:
+            for read, cls in readClass.items():
+                out.write("%s\t%s\n" % (read, cls))
+
+rule its_get58sClassifications:
+    input: otuReads="swarm/all.otuReads.tsv", r58SreadCls="taxonomy/all_5_8S_classification.tsv"
+    output: "taxonomy/all_ITS2.otus_5.8sClass.tsv"
+    log: "logs/all_get58sClass.log"
+    params: stringency=0.90
+    run:
+        with open(log[0], "w") as logFile, open(output[0], "w") as out:
+            
+            otuReads = {}
+            for line in open(input.otuReads):
+                otuId, readId = line.strip().split("\t")
+                try:
+                    otuReads[otuId].append(readId)
+                except KeyError:
+                    otuReads[otuId] = [readId]
+            readCls58S = {}
+            for line in open(input.r58SreadCls):
+                read, cls = line.strip("\n").split("\t")
+                if cls == "":
+                    readCls58S[read] = "unknown"
+                else:
+                    readCls58S[read] = cls
+            
+            for otu, reads in otuReads.items():
+                otuCls = []
+                for readId in reads:
+                    try:
+                        tCls = readCls58S[readId]
+                        if tCls != "unknown":
+                            otuCls.append(tCls)
+                    except KeyError:
+                        logFile.write("No 5.8S classification for read %s.\n" % readId)
+                if otuCls:
+                    lcaStr =  lca(otuCls, params.stringency)
+                    lcPhylum = ";".join(lcaStr.split(";")[:2]) #trim the lineage down to phylum (2. level)
+                    out.write("%s\t%s\t%i\n" % (otu, lcPhylum, len(otuCls)))
+                else:
+                    out.write("%s\tunknown\t0\n" % (otu))
+
+rule its_kronaPrep:
+    input: cls="taxonomy/all.ITS2.classification.tsv", sample="readInfo/sample_R1.tsv"
+    output: tab=expand("krona/{sample}_ITS2.krona.tsv", sample=samples)
+    run:
+        sampleReads = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            try:
+                sampleReads[sample].append(read)
+            except KeyError:
+                sampleReads[sample] = [read]
+        readCls = {}
+        for line in open(input.cls):
+            read, cls = line.strip("\n").split("\t")
+            readCls[read] = cls
+        for outPath in output:
+            sample = outPath.split("/")[1][:-15]
+            with open(outPath, "w") as out:
+                clsCount = {}
+                for read in sampleReads[sample]:
+                    if read not in readCls:
+                        #this are reads that were filtered out after the sample
+                        # file was created
+                        continue
+                    try:
+                        clsCount[readCls[read]] += 1
+                    except KeyError:
+                        clsCount[readCls[read]] = 1
+                for cls, count in clsCount.items():
+                    out.write("%i\t%s\n" % (count, "\t".join(cls.split(";"))))
 
 rule its_krona:
-    input: its_kronaInput
+    input: expand("krona/{sample}_ITS2.krona.tsv", sample=samples)
     output: "krona/ITS2.krona.html"
     shell:
         "%(ktImportText)s -o {output} {input}" % config
 
 rule final_combineClassification:
-    input: its="taxonomy/{sample}.ITS2.otus.class.tsv", tsu="taxonomy/{sample}_ITS2.otus_5.8sClass.tsv"
-    output: "taxonomy/{sample}.ITS2.otus.combClass.tsv", "taxonomy/{sample}.ITS2.otus.conflictingClass.tsv"
+    input: itsCls="taxonomy/all.ITS2.otus.class.tsv", r58sCls="taxonomy/all_ITS2.otus_5.8sClass.tsv"
+    output: otuComb="taxonomy/all.ITS2.otus.combClass.tsv", conflict="taxonomy/all.ITS2.otus.conflictingClass.tsv"
     run:
         tsu = {}
+        for line in open(input.r58sCls):
+            name, lin, number = line.strip("\n").split("\t")
+            tsu[name.split("|")[0]] = lin
         conflict = {}
-        for line in open(input.tsu):
-            name, lin, number = line.strip().split("\t")
-            tsu[name] = lin
-        with open(output[0], "w") as out:
-            for line in open(input.its):
-                name, linStr = line.strip().split("\t")
+        with open(output.otuComb, "w") as out:
+            for line in open(input.itsCls):
+                nameStr, linStr = line.strip("\n").split("\t")
+                name = nameStr.split("|")[0]
                 lin = linStr.split(";")
                 tsuLin = tsu[name].split(";")
                 if len(lin) < 2:
@@ -501,32 +683,115 @@ rule final_combineClassification:
                             conflict[(";".join(lin[:2]), ";".join(tsuLin[:2]))] += 1
                         except:
                             conflict[(";".join(lin[:2]), ";".join(tsuLin[:2]))] = 1
-        with open(output[1], "w") as out:
+        with open(output.conflict, "w") as out:
             for conf, number in conflict.items():
                 out.write("%s | %s\t%i\n" % (conf[0], conf[1], number))
 
+rule final_classCompare:
+    input: itsCls="taxonomy/all.ITS2.otus.class.tsv", otuReads="swarm/all.otuReads.tsv", r58SreadCls="taxonomy/all_5_8S_classification.tsv", r58sOtuCls="taxonomy/all_ITS2.otus_5.8sClass.tsv", combCls="taxonomy/all.ITS2.otus.combClass.tsv", sample="readInfo/sample_R1.tsv"
+    output: comp="taxonomy/all.compareClass.tsv"
+    run:
+        readSample = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            readSample[read] = sample
+        otuReads = {}
+        for line in open(input.otuReads):
+            otuId, readId = line.strip().split("\t")
+            try:
+                otuReads[otuId].append(readId)
+            except KeyError:
+                otuReads[otuId] = [readId]
+        readCls58S = {}
+        for line in open(input.r58SreadCls):
+            read, cls = line.strip("\n").split("\t")
+            if cls == "":
+                readCls58S[read] = "unknown"
+            else:
+                readCls58S[read] = cls
+        otuCls58S = {}
+        for line in open(input.r58sOtuCls):
+            name, lin, number = line.strip("\n").split("\t")
+            otuCls58S[name.split("|")[0]] = lin
+        itsClass = {}
+        for line in open(input.itsCls):
+            nameStr, cls = line.strip("\n").split("\t")
+            itsClass[nameStr.split("|")[0]] = cls
+        combCls = {}
+        for line in open(input.combCls):
+            otuId, cls = line.strip("\n").split("\t")
+            combCls[otuId] = cls
+        with open(output.comp, "w") as out:
+            out.write("read\tsample\tOTU\tITS OTU Class\t5.8S read Class\t5.8S OTU Class\tComb OTU Class\n")
+            for line in open(input.otuReads):
+                otuIdStr, readId = line.strip("\n").split("\t")
+                otuId = otuIdStr.split("|")[0]
+                out.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (readId,
+                                                readSample[readId],
+                                                otuId,
+                                                itsClass.get(otuId, "--"),
+                                                readCls58S.get(readId, "--"),
+                                                otuCls58S.get(otuId, "--"),
+                                                combCls.get(otuId, "--")
+                                                )
+                         )
+
+rule its_perSampleOtuReads:
+    input: otuReads="swarm/all.otuReads.tsv", sample="readInfo/sample_R1.tsv"
+    output: expand("swarm/{sample}.ITS2.otus.out", sample=samples)
+    run:
+        readOtu = {}
+        for line in open(input.otuReads):
+            otuId, readId = line.strip("\n").split("\t")
+            readOtu[readId] = otuId
+        sampleReads = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            try:
+                sampleReads[sample].append(read)
+            except KeyError:
+                sampleReads[sample] = [read]
+        for outPath in output:
+            sample = outPath.split("/")[1][:-14]
+            otuCount = {}
+            for read in sampleReads[sample]:
+                if read in readOtu:
+                    #some reads in the sample never made it to an OTU because 
+                    # they were filtered, but otherwise we do this
+                    try:
+                        otuCount[readOtu[read]] += 1
+                    except KeyError:
+                        otuCount[readOtu[read]] = 1
+            with open(outPath, "w") as out:
+                for otuId, count in otuCount.items():
+                    out.write("%s\t%i\n" % (otuId, count))
+
+
 rule final_kronaPrepStep1:
-    input: tax="taxonomy/{sample}.ITS2.otus.combClass.tsv", otus="swarm/{sample}.ITS2.otus.fasta"
+    input: tax="taxonomy/all.ITS2.otus.combClass.tsv", otuReads = "swarm/{sample}.ITS2.otus.out"
     output: "krona/{sample}_all.krona.json"
     run:
-        count={}
-        for rec in SeqIO.parse(open(input.otus), "fasta"):
-            size = int(rec.id.rsplit("_",1)[-1])
-            name = rec.id.split("|", 1)[0]
-            count[name] = size
+        otuCount = {}
+        for line in open(input.otuReads):
+            otuIdStr, count = line.strip("\n").split("\t")
+            otuId = otuIdStr.split("|")[0]
+            otuCount[otuId] = int(count)
         data = {"$": []}
         for line in open(input.tax):
-            name, linStr = line.strip().split("\t")
+            name, linStr = line.strip("\n").split("\t")
             lin = linStr.split(";")
+            if name not in otuCount:
+                #not all OTUs are in all samples
+                continue
             if lin[0] == "unknown":
-                data["$"].append(count[name])
+                data["$"].append(otuCount[name])
                 continue
             here = data
             for entry in lin:
                 try:
-                    here["$"].append(count[name])
+                    here["$"].append(otuCount[name])
                 except KeyError:
-                    here["$"] = [count[name]]
+                    here["$"] = [otuCount[name]]
                 try:
                     here = here[entry]
                 except KeyError:
@@ -534,23 +799,21 @@ rule final_kronaPrepStep1:
                     here = here[entry]
             #add count for the last one
             try:
-                here["$"].append(count[name])
+                here["$"].append(otuCount[name])
             except KeyError:
-                here["$"] = [count[name]]
+                here["$"] = [otuCount[name]]
         
         with open(output[0], "w") as out:
             out.write(json.dumps(data))
 
-def final_kronaInput(wildcards):
-    return ["krona/%s_all.krona.json" % s for s in samples]
 
 rule final_kronaPrepStep2:
-    input:  final_kronaInput
+    input:  expand("krona/{sample}_all.krona.json", sample=samples)
     output: "krona/All.krona.xml"
     run:
         data={}
         for inFile in input:
-            sample = "_".join(inFile.split("_")[:2]).split("/")[-1]
+            sample = inFile.split("/")[1][:-15]
             data[sample] = json.load(open(inFile))
         samples = list(data.keys())
         samples.sort()
@@ -627,7 +890,7 @@ class TaxTreeNode(object):
         return lines
 
 
-def mothurLCA(lineageStrings, stringency=1.0):
+def lca(lineageStrings, stringency=1.0):
     lineage = []
     mLineages = []
     #remove bootstrap values ("(100)", "(75)", etc.) if any
@@ -636,12 +899,14 @@ def mothurLCA(lineageStrings, stringency=1.0):
         for entry in mLin:
              mLineages[-1].append(entry.split("(")[0])
     i=0
-    minLinLen = min([len(m) for m in mLineages])
-    while i<minLinLen:
+    maxLinLen = max([len(m) for m in mLineages])
+    while i<maxLinLen:
         tLin = None # <- this will save the first non "unknown" entry in this lineage level
         different = 0.0
         total = 0.0
         for memberLin in mLineages:
+            if len(memberLin) <= i:
+                continue #ignore lineages that are not this long
             if memberLin[i].split("__")[-1] in ["unidentified", "unclassified", "unknown"]:
                 # ignoring unidentified entrys
                 continue
