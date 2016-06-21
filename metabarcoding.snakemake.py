@@ -38,13 +38,13 @@ rule db_creatUniteIndex:
 
 rule init_concat:
     params: inFolder="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls"
-    output: comb="raw/all_R{read_number}.fastq.gz", sample="readInfo/sample_R{read_number}.tsv", name="readInfo/name_R{read_number}.tsv"
+    output: comb="raw/all_{read}.fastq.gz", sample="readInfo/sample_{read}.tsv", name="readInfo/name_{read}.tsv"
     run:
         with gzip.open(output.comb, "wt") as combOut, \
              open(output.sample, "w") as sampleOut, \
              open(output.name, "w") as nameOut:
             for sample in samples:
-                path = "%s/%s_L*_R%s_*.fastq.gz" % (params.inFolder, sample, wildcards.read_number)
+                path = "%s/%s_L*_%s_*.fastq.gz" % (params.inFolder, sample, wildcards.read)
                 inFiles=glob.glob(path)
                 if not inFiles:
                     raise RuntimeError("No file(s) found for sample %s at %s." % (sample, path))
@@ -69,29 +69,96 @@ def qc_multiqc_input(wildcards):
 
 rule qc_multiqc:
     input: qc_multiqc_input
-    output: "QC/multiqc_report.html"
+    output: "QC/multiqc_report.html", "QC/multiqc_data/multiqc_fastqc.txt"
     shell:
-        "%(multiqc)s --interactive -o QC QC/*_fastqc.zip" % config
+        "%(multiqc)s -f --interactive -o QC QC/*_fastqc.zip" % config
+
+rule qc_readCounts:
+    input: "QC/multiqc_data/multiqc_fastqc.txt"
+    output: "readNumbers/rawReadNumbers.tsv"
+    run:
+        with open(output[0], "w") as out:
+            for l, line in enumerate(open(input[0])):
+                if l==0:
+                    continue #skip header
+                arr = line.strip("\n").split("\t")
+                #Sample	avg_sequence_length	percent_dedup	percent_duplicates	seq_len_read_count	seq_len_bp	sequence_length	total_sequences	percent_gc
+                sample, lane, readNum, part = arr[0].rsplit("_", 3)
+                if readNum != "R1":
+                    continue # only use R1
+                seqNum = int(float(arr[-2]))
+                out.write("%s\t%i\n" % (sample, seqNum))
+
+rule init_filterByBarcodeQuality:
+    input: read1="raw/all_R1.fastq.gz", read2="raw/all_R2.fastq.gz", index1="raw/all_I1.fastq.gz", index2="raw/all_I2.fastq.gz"
+    output: "raw/all_goodIndex_R1.fastq.gz", "raw/all_goodIndex_R2.fastq.gz"
+    log: "logs/all_indexQualFilter.log"
+    run:
+        with gzip.open(output[0], "wt") as out1, gzip.open(output[1], "wt") as out2:
+            with gzip.open(input.read1, "rt") as read1File, gzip.open(input.read2, "rt") as read2File, gzip.open(input.index1, "rt") as index1File, gzip.open(input.index2, "rt") as index2File:
+                read1 = SeqIO.parse(read1File, "fastq")
+                read2 = SeqIO.parse(read2File, "fastq")
+                index1 = SeqIO.parse(index1File, "fastq")
+                index2 = SeqIO.parse(index2File, "fastq")
+                while True:
+                    try:
+                        r1 = next(read1)
+                    except StopIteration:
+                        break
+                    r2 = next(read2)
+                    i1 = next(index1)
+                    i2 = next(index2)
+                    minQi1 = min(i1._per_letter_annotations["phred_quality"])
+                    minQi2 = min(i2._per_letter_annotations["phred_quality"])
+                    if min(minQi1, minQi2) >= 20:
+                        out1.write(r1.format("fastq"))
+                        out2.write(r2.format("fastq"))
+
+rule init_indexQualityReadNumbers:
+    input: reads="raw/all_goodIndex_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
+    output: "readNumbers/indexQualityReadNumbers.tsv"
+    run:
+        readSample = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            readSample[read] = sample
+        sampleReads = {}
+        for rec in SeqIO.parse(gzip.open(input.reads, "rt"), "fastq"):
+            sample = readSample[rec.id]
+            try:
+                sampleReads[sample] += 1
+            except KeyError:
+                sampleReads[sample] = 1
+        with open(output[0], "w") as out:
+            for sample, value in sampleReads.items():
+                out.write("%s\t%s\n" % (sample, value))
 
 rule init_filterPrimer:
-    input: read1="raw/all_R1.fastq.gz", read2="raw/all_R2.fastq.gz"
+    input: read1="raw/all_goodIndex_R1.fastq.gz", read2="raw/all_goodIndex_R2.fastq.gz"
     output: "primers/all_barcode_ITS-ITS_1.fastq.gz", "primers/all_barcode_ITS-ITS_2.fastq.gz"
     log: "logs/all_flexbar.log"
     threads: 6
     shell:
         "echo \">ITS\n%(forward_primer)s\" > primers/fwd_primer.fasta; echo \">ITS\n%(reverse_primer)s\" > primers/rev_primer.fasta; %(flexbar)s -n {threads} -r {input.read1} -p {input.read2} -t primers/all -b primers/fwd_primer.fasta -b2 primers/rev_primer.fasta -bk -be LEFT_TAIL -bn 25 -bt 1.0 -f i1.8 -u 100 -z GZ &> {log}" % config
 
-#rule init_primerReadNumbers:
-#    input: expand(["demultiplexed/all_barcode_ITS_1.fastq.gz"], sample=samples)
-#    output: "primerReadNumbers.tsv"
-#    run:
-#        with open(output[0], "w") as out:
-#            for inFile in input:
-#                rn = 0
-#                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
-#                    rn +=1
-#                sample = inFile.split("_barcode_")[0].split("/")[-1]
-#                out.write("%s\t%i\n" % (sample, rn))
+rule init_primerReadNumbers:
+    input: reads="primers/all_barcode_ITS-ITS_1.fastq.gz", sample="readInfo/sample_R1.tsv"
+    output: "readNumbers/primerReadNumbers.tsv"
+    run:
+        readSample = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            readSample[read] = sample
+        sampleReads = {}
+        for rec in SeqIO.parse(gzip.open(input.reads, "rt"), "fastq"):
+            sample = readSample[rec.id]
+            try:
+                sampleReads[sample] += 1
+            except KeyError:
+                sampleReads[sample] = 1
+        with open(output[0], "w") as out:
+            for sample, value in sampleReads.items():
+                out.write("%s\t%s\n" % (sample, value))
 
 rule init_trimming:
     input: r1="primers/all_barcode_ITS-ITS_1.fastq.gz", r2="primers/all_barcode_ITS-ITS_2.fastq.gz"
@@ -114,18 +181,25 @@ rule init_trimming:
 #        ggplot(d) + geom_histogram(aes(len, fill=readNr), position="dodge", binwidth=5)
 #        ggsave("{output}")
 #        """)
-        
-#rule init_trimmedReadNumbers:
-#    input: expand(["trimmed/{sample}_trimmed_R1.fastq.gz"], sample=samples)
-#    output: "trimmedReadNumbers.tsv"
-#    run:
-#        with open(output[0], "w") as out:
-#            for inFile in input:
-#                rn = 0
-#                for seq in SeqIO.parse(gzip.open(inFile, "rt"), "fastq"):
-#                    rn +=1
-#                sample = inFile.split("_trimmed_")[0].split("/")[-1]
-#                out.write("%s\t%i\n" % (sample, rn))
+
+rule init_trimmedReadNumbers:
+    input: reads="trimmed/all_trimmed_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
+    output: "readNumbers/trimmedReadNumbers.tsv"
+    run:
+        readSample = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            readSample[read] = sample
+        sampleReads = {}
+        for rec in SeqIO.parse(gzip.open(input.reads, "rt"), "fastq"):
+            sample = readSample[rec.id]
+            try:
+                sampleReads[sample] += 1
+            except KeyError:
+                sampleReads[sample] = 1
+        with open(output[0], "w") as out:
+            for sample, value in sampleReads.items():
+                out.write("%s\t%s\n" % (sample, value))
 
 rule init_merge:
     input: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
@@ -144,38 +218,56 @@ rule init_convertMerged:
             for record in SeqIO.parse(open(input[0]), "fastq"):
                 out.write(record.format("fasta"))
 
-#rule init_mergedReadNumbers:
-#    input: expand(["merged/{sample}.fasta"], sample=samples)
-#    output: "mergedReadNumbers.tsv"
-#    run:
-#        with open(output[0], "w") as out:
-#            for inFile in input:
-#                rn = 0
-#                for seq in SeqIO.parse(open(inFile), "fasta"):
-#                    rn +=1
-#                sample = inFile.split(".")[0].split("/")[-1]
-#                out.write("%s\t%i\n" % (sample, rn))
+rule init_mergedReadNumbers:
+    input: reads="merged/all.assembled.fastq", sample="readInfo/sample_R1.tsv"
+    output: "readNumbers/mergedReadNumbers.tsv"
+    run:
+        readSample = {}
+        for line in open(input.sample):
+            read, sample = line.strip("\n").split("\t")
+            readSample[read] = sample
+        sampleReads = {}
+        for rec in SeqIO.parse(open(input.reads), "fastq"):
+            sample = readSample[rec.id]
+            try:
+                sampleReads[sample] += 1
+            except KeyError:
+                sampleReads[sample] = 1
+        with open(output[0], "w") as out:
+            for sample, value in sampleReads.items():
+                out.write("%s\t%s\n" % (sample, value))
 
-#rule init_readNumberOverview:
-#    input: primer="primerReadNumbers.tsv", trimmed="trimmedReadNumbers.tsv", merged="mergedReadNumbers.tsv"
-#    output: "readNumbers.pdf"
-#    run:
-#        R("""
-#        library(ggplot2)
-#        primer = read.table("{input.primer}", header=F)
-#        primer$stage = "primerFound"
-#        d = primer
-#        trimmed = read.table("{input.trimmed}", header=F)
-#        trimmed$stage = "trimmed"
-#        d=rbind(d, trimmed)
-#        merged = read.table("{input.merged}", header=F)
-#        merged$stage = "merged"
-#        d=rbind(d,merged)
-#        colnames(d) = c("sample", "readNum", "stage")
-#        d$stage = factor(d$stage, levels=c("merged", "trimmed", "primerFound"))
-#        ggplot(d) + geom_bar(aes(sample, readNum, fill=stage), stat="identity", position="dodge") + coord_flip() + geom_hline(yintercept = 20000, linetype="dashed")
-#        ggsave("{output}", width=7, height=28, units="in")
-#        """)
+rule init_readNumberOverview:
+    input: raw="readNumbers/rawReadNumbers.tsv", indexQual="readNumbers/indexQualityReadNumbers.tsv", primer="readNumbers/primerReadNumbers.tsv", trimmed="readNumbers/trimmedReadNumbers.tsv", merged="readNumbers/mergedReadNumbers.tsv"
+    output: "readNumbers/readNumbers.pdf"
+    run:
+        R("""
+        library(ggplot2)
+        raw = read.table("{input.raw}", header=F)
+        raw = raw[order(raw$V1),]
+        raw$stage = "raw"
+        d = raw
+        iQual = read.table("{input.indexQual}", header=F)
+        iQual = iQual[order(iQual$V1),]
+        iQual$stage = "indexQualityFiltered"
+        d = rbind(d, iQual)
+        primer = read.table("{input.primer}", header=F)
+        primer = primer[order(primer$V1),]
+        primer$stage = "primerFound"
+        d = rbind(d, primer)
+        trimmed = read.table("{input.trimmed}", header=F)
+        trimmed = trimmed[order(trimmed$V1),]
+        trimmed$stage = "trimmed"
+        d=rbind(d, trimmed)
+        merged = read.table("{input.merged}", header=F)
+        merged = merged[order(merged$V1),]
+        merged$stage = "merged"
+        d=rbind(d,merged)
+        colnames(d) = c("sample", "readNum", "stage")
+        d$stage = factor(d$stage, levels=c("merged", "trimmed", "primerFound", "indexQualityFiltered", "raw"))
+        ggplot(d) + geom_bar(aes(sample, readNum, fill=stage), stat="identity", position="dodge") + coord_flip() + geom_hline(yintercept = 10000, linetype="dashed")
+        ggsave("{output}", width=7, height=28, units="in")
+        """)
 
 rule init_dereplicate:
     input: "merged/all.fasta"
@@ -766,6 +858,23 @@ rule its_perSampleOtuReads:
                 for otuId, count in otuCount.items():
                     out.write("%s\t%i\n" % (otuId, count))
 
+rule final_creatOtuTable:
+    input: tax="taxonomy/all.ITS2.otus.combClass.tsv", otus=expand("swarm/{sample}.ITS2.otus.out", sample=samples)
+    output: "otu_table.tsv"
+    run:
+        readNr = {}
+        for sample in samples:
+            readNr[sample] = {}
+            for line in open("swarm/%s.ITS2.otus.out" % sample):
+                otuStr, nr = line.strip("\n").split("\t")
+                otu = otuStr.split("|")[0]
+                readNr[sample][otu] = nr
+        with open(output[0], "w") as out:
+            out.write("otu_ID\tclassification\t%s\n" % "\t".join(samples))
+            for line in open(input.tax):
+                otu, cls = line.strip("\n").split("\t")
+                numbers = [readNr[sample].get(otu, "0") for sample in samples]
+                out.write("%s\t%s\t%s\n" % (otu, cls, "\t".join(numbers)))
 
 rule final_kronaPrepStep1:
     input: tax="taxonomy/all.ITS2.otus.combClass.tsv", otuReads = "swarm/{sample}.ITS2.otus.out"
@@ -900,25 +1009,35 @@ def lca(lineageStrings, stringency=1.0):
              mLineages[-1].append(entry.split("(")[0])
     i=0
     maxLinLen = max([len(m) for m in mLineages])
+    active = [True]*len(mLineages)
     while i<maxLinLen:
-        tLin = None # <- this will save the first non "unknown" entry in this lineage level
-        different = 0.0
         total = 0.0
-        for memberLin in mLineages:
+        counts = {}
+        for m, memberLin in enumerate(mLineages):
+            if not active[m]:
+                continue #ignore lineages that were deactivated further up in the tree
             if len(memberLin) <= i:
+                active[m] = False
                 continue #ignore lineages that are not this long
             if memberLin[i].split("__")[-1] in ["unidentified", "unclassified", "unknown"]:
-                # ignoring unidentified entrys
-                continue
+                continue # ignoring unidentified entrys
             total += 1
-            if tLin is None:
-                tLin = memberLin[i] # if we have not seen a non "unknown" entry at this level, this becomes our reference
-            else:
-                if memberLin[i] != tLin:
-                    different += 1
+            try:
+                counts[memberLin[i]] += 1
+            except KeyError:
+                counts[memberLin[i]] = 1
+        if not counts:
+            #no valid lineage entrys found in this level
+            break
+        most=sorted(counts.items(), key=lambda x: x[1], reverse=True)[0]
+        different = total - most[1]
         #accept the lineage entry if its proportion of all (valid) classifications higher than stringency setting
-        if not tLin is None and different/total <= (1.0-stringency):
-            lineage.append(tLin)
+        if different/total <= (1.0-stringency):
+            lineage.append(most[0]) #add the most apearing entry to the new lineage
+            #deactivate all lineages that were different at this level
+            for m, memberLin in enumerate(mLineages):
+                if active[m] and memberLin[i] != most[0]:
+                    active[m] = False
         else:
             break
         i += 1
