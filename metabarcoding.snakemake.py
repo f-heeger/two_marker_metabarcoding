@@ -28,7 +28,7 @@ include: "generate58SDatabase.snakefile.py"
 ################ generate lamda db from UNTIE ##################################
 
 rule db_creatUniteIndex:
-    input: "dbs/UNITE_public_31.01.2016.ascii.good.fasta"
+    input: "%(dbFolder)s/UNITE_public_31.01.2016.ascii.good.fasta" % config
     output: touch("dbs/UNITE_public_31.01.2016.ascii.fasta.lambdaIndexCreated")
     threads: 6
     shell:
@@ -37,14 +37,13 @@ rule db_creatUniteIndex:
 ################ quality control ###############################################
 
 rule init_concat:
-    params: inFolder="/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls"
     output: comb="raw/all_{read}.fastq.gz", sample="readInfo/sample_{read}.tsv", name="readInfo/name_{read}.tsv"
     run:
         with gzip.open(output.comb, "wt") as combOut, \
              open(output.sample, "w") as sampleOut, \
              open(output.name, "w") as nameOut:
             for sample in samples:
-                path = "%s/%s_L*_%s_*.fastq.gz" % (params.inFolder, sample, wildcards.read)
+                path = "%s/%s_L*_%s_*.fastq.gz" % (config["inFolder"], sample, wildcards.read)
                 inFiles=glob.glob(path)
                 if not inFiles:
                     raise RuntimeError("No file(s) found for sample %s at %s." % (sample, path))
@@ -58,7 +57,7 @@ rule init_concat:
                             sampleOut.write("%s\t%s\n" % (newId, sample))
 
 rule qc_fastqc:
-    input: "/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls/{sample}_L001_R{read_number}_001.fastq.gz"
+    input: "%(inFolder)s/{sample}_L001_R{read_number}_001.fastq.gz" % config
     output: "QC/{sample}_L001_R{read_number}_001_fastqc.zip"
     threads: 6
     shell:
@@ -388,7 +387,7 @@ rule r58S_dereplicate:
                     out.write("%s\t%s\n" % (seq, cluster))
 
 rule r58S_align:
-    input: reads="mothur/all.5_8S_derep.fasta", db="dbs/UNITE.5_8S.aln"
+    input: reads="mothur/all.5_8S_derep.fasta", db="%(dbFolder)s/UNITE.5_8S.aln" % config
     output: align="mothur/all.5_8S_derep.align", report="mothur/all.5_8S_derep.align.report"
     threads: 3
     log: "logs/58S_mothur.log"
@@ -396,7 +395,7 @@ rule r58S_align:
         "%(mothur)s -q \"#set.logfile(name={log}, append=T); align.seqs(candidate={input.reads}, template={input.db}, processors={threads});\" > /dev/null" % config
         
 rule r58S_classify:
-    input: aln="mothur/all.5_8S_derep.align", ref="dbs/UNITE.5_8S.aln", tax="dbs/UNITE.5_8S.tax"
+    input: aln="mothur/all.5_8S_derep.align", ref="%(dbFolder)s/UNITE.5_8S.aln" % config, tax="%(dbFolder)s/UNITE.5_8S.tax" % config
     output: "mothur/all.5_8S_derep.5_8S.wang.taxonomy", "mothur/all.5_8S_derep.5_8S.wang.tax.summary"
     log: "logs/58s_mothur.log"
     params: cutoff=60
@@ -553,7 +552,7 @@ rule its_clustering:
 
 
 rule its_alignToUnite:
-    input: otus="swarm/all.ITS2.otus.fasta", db="dbs/UNITE_public_31.01.2016.ascii.good.fasta", dbFlag="dbs/UNITE_public_31.01.2016.ascii.fasta.lambdaIndexCreated"
+    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/UNITE_public_31.01.2016.ascii.good.fasta" % config, dbFlag="%(dbFolder)s/UNITE_public_31.01.2016.ascii.fasta.lambdaIndexCreated" % config
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3

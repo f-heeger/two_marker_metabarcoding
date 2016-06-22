@@ -12,6 +12,8 @@
     "ktImportXML": "ktImportXML",
     "swarm": "/home/heeger/bin/swarm/bin/swarm",
     "lambdaFolder": "/home/heeger/bin/lambda-v0.9.3-linux_x86-64/bin",
+    "inFolder": "/home/heeger/spree/raw_data/2016/illumina/160202_2015-37-CW-Japan-Repeat/Data/Intensities/BaseCalls",
+    "dbFolder": "dbs",
     "samples": {"A1_S1": "A1_S1",
                 "B1_S2": "B1_S2",
                 "C1_S3": "C1_S3",
