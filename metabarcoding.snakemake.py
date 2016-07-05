@@ -3,6 +3,7 @@ import json
 import xml.etree.ElementTree as et
 import gzip
 import glob
+import random
 
 from snakemake.utils import min_version, R
 from Bio import SeqIO
@@ -18,7 +19,7 @@ shell.prefix("sleep 10; ") #work aorund to desl with "too quck" rule execution a
 samples = config["samples"].keys()
 
 rule all:
-    input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv"
+    input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv", "otu_table.tsv", "All.rarefactions.pdf"
 #    input: "taxonomy/All.krona.html", "taxonomy/5_8s.krona.html", expand(["taxonomy/{sample}_ITS2.otus_5.8sClass.tsv", "taxonomy/{sample}.ITS2.otus.class.tsv"], sample=samples)
 
 ################ generate reference sequence for 5.8S ##########################
@@ -474,9 +475,8 @@ rule r58S_prepKronaInput:
                     try:
                         cls = readCls[read]
                     except KeyError:
-                        pass
-                        #this are reads that were filtered out after the sample
-                        # file was created
+                        #reads that were removed in between
+                        continue
                     try:
                         clsCount[cls] += 1
                     except KeyError:
@@ -856,6 +856,80 @@ rule its_perSampleOtuReads:
             with open(outPath, "w") as out:
                 for otuId, count in otuCount.items():
                     out.write("%s\t%i\n" % (otuId, count))
+
+rule final_computeRarefaction:
+    input: "swarm/{sample}.ITS2.otus.out"
+    output: "rarefaction/{sample}.rarefaction.tsv"
+    params: rep=100, step=1000
+    run:
+        otutab = []
+        for line in open(input[0]):
+            otuId, count = line.strip("\n").split("\t")
+            otutab.extend([otuId]*int(count))
+        points = {}
+        for r in range(params.rep):
+            for x in range(1, len(otutab), params.step):
+                y = len(set(random.sample(otutab, x)))
+                try:
+                    points[x].append(y)
+                except KeyError:
+                    points[x] = [y]
+        with open(output[0], "w") as out:
+            for x, yList in points.items():
+                for y in yList:
+                    out.write("%i\t%i\n" % (x,y))
+
+rule final_combineRarefactions:
+    input: expand("rarefaction/{sample}.rarefaction.tsv", sample=samples)
+    output: "rarefaction/All.rarefactions.tsv"
+    run:
+        with open(output[0], "w") as out:
+            for sample in samples:
+                for line in open("rarefaction/%s.rarefaction.tsv" % sample):
+                    out.write("%s\t%s" % (sample, line)) #no \n at the end as it was not striped from the line
+
+rule final_plotRarefactions:
+    input: "rarefaction/All.rarefactions.tsv"
+    output: "All.rarefactions.pdf"
+    run:
+        R("""library(ggplot2)
+        
+            raw=read.table("{input}")
+            colnames(raw) = c("sample", "x", "y")
+
+            allPlotData = data.frame()
+            anno=data.frame()
+
+            for (tSample in unique(raw$sample)){{
+
+                print(tSample)
+                d = subset(raw, sample==tSample)
+                plotData = data.frame(unique(d$x))
+                colnames(plotData) = c("x")
+                N=length(plotData$x)
+
+                plotData$mean=NA
+                plotData$cmin=NA
+                plotData$cmax=NA
+                plotData$sample=tSample
+
+                conf = 0.95
+
+                for (i in 1:length(plotData$x)) {{
+                    x_i = plotData$x[i]
+                    s = subset(d, x==x_i)
+                    plotData$mean[i] = mean(s$y)
+                    plotData$cmin[i] = sort(s$y)[floor(length(s$y)*(1-conf)/2)]
+                    plotData$cmax[i] = sort(s$y)[ceiling(length(s$y)*(1-(1-conf)/2))]
+                }}
+                anno=rbind(anno, plotData[plotData$x==max(plotData$x),])
+
+            allPlotData = rbind(allPlotData, plotData)
+
+            }}
+
+            ggplot(allPlotData, aes(x, mean)) + geom_point(aes(color=sample), size=0.1) + geom_ribbon(aes(ymin=cmin, ymax=cmax, fill=sample), alpha=0.2) + annotate("text", x=anno$x, y=anno$mean, label=anno$sample)
+            ggsave("{output}", width=16, height=9)""")
 
 rule final_creatOtuTable:
     input: tax="taxonomy/all.ITS2.otus.combClass.tsv", otus=expand("swarm/{sample}.ITS2.otus.out", sample=samples)
