@@ -562,8 +562,10 @@ rule its_alignToUnite:
 rule its_classify:
     input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta"
     output: "taxonomy/all.ITS2.otus.class.tsv"
-    params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0
+    params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=1.00
+    log: "logs/its_class.log"
     run:
+        logOut = open(log, "w")
         classifi = {}
         itsLength = {}
         seqNr = 0
@@ -592,10 +594,10 @@ rule its_classify:
             if linStr.endswith("Incertae"):
                 linStr += "_sedis" #FIXME: workaroud for taking the tayonomy from the fasta header which ends at a space. Wither fix fasta headers or take taxonomy from UNITE taxonomy file
             classifi[qseqid].append((linStr, float(bitscore)))
-        print("%i alignmetns for %i sequences" % (total, seqNr))
-        print("%i excluded, because e-value was higher than %e" % (evalueFilter, params.maxE))
-        print("%i excluded, because identity was lower than %d%%" % (identFilter, params.minIdent))
-        print("%i excluded, because coverage was lower than %d%%" % (evalueFilter, params.minCov))
+        logOut.write("%i alignmetns for %i sequences\n" % (total, seqNr))
+        logOut.write("%i excluded, because e-value was higher than %e\n" % (evalueFilter, params.maxE))
+        logOut.write("%i excluded, because identity was lower than %d%%\n" % (identFilter, params.minIdent))
+        logOut.write("%i excluded, because coverage was lower than %d%%\n" % (evalueFilter, params.minCov))
         topPerc = params.topPerc/100.0
         with open(output[0], "w") as out:
             for key, hits in classifi.items():
@@ -608,6 +610,10 @@ rule its_classify:
                         cutoff += 1
                     lineage = lca([hit[0] for hit in sortedHits[:cutoff]])
                     out.write("%s\t%s\n" % (key, lineage))
+        try:
+            logOut.close()
+        except:
+            pass
 
 rule its_readClassification:
     input: tax="taxonomy/all.ITS2.otus.class.tsv", otuList="swarm/all.ITS2.otus.out", repIts="readInfo/all.repITS2.tsv", repSeq="readInfo/all.repseq.tsv"
@@ -780,7 +786,7 @@ rule final_combineClassification:
 
 rule final_classCompare:
     input: itsCls="taxonomy/all.ITS2.otus.class.tsv", otuReads="swarm/all.otuReads.tsv", r58SreadCls="taxonomy/all_5_8S_classification.tsv", r58sOtuCls="taxonomy/all_ITS2.otus_5.8sClass.tsv", combCls="taxonomy/all.ITS2.otus.combClass.tsv", sample="readInfo/sample_R1.tsv"
-    output: comp="taxonomy/all.compareClass.tsv"
+    output: comp="taxonomy/all.compareClass.tsv", stat="taxonomy/all.clsStat.tsv"
     run:
         readSample = {}
         for line in open(input.sample):
@@ -812,7 +818,7 @@ rule final_classCompare:
         for line in open(input.combCls):
             otuId, cls = line.strip("\n").split("\t")
             combCls[otuId] = cls
-        with open(output.comp, "w") as out:
+        with open(output.comp, "w") as out, open(output.stat, "w") as stat:
             out.write("read\tsample\tOTU\tITS OTU Class\t5.8S read Class\t5.8S OTU Class\tComb OTU Class\n")
             for line in open(input.otuReads):
                 otuIdStr, readId = line.strip("\n").split("\t")
@@ -826,6 +832,9 @@ rule final_classCompare:
                                                 combCls.get(otuId, "--")
                                                 )
                          )
+                stat.write("58S\t%s\t%i\n" % (otuId, len(otuCls58S.get(otuId, "").split(";"))))
+                stat.write("ITS2\t%s\t%i\n" % (otuId, len(itsClass.get(otuId, "").split(";"))))
+                stat.write("comb\t%s\t%i\n" % (otuId, len(combCls.get(otuId, "").split(";"))))
 
 rule its_perSampleOtuReads:
     input: otuReads="swarm/all.otuReads.tsv", sample="readInfo/sample_R1.tsv"
