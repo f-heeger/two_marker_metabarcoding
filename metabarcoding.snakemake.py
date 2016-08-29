@@ -895,7 +895,7 @@ rule final_classCompare:
                             depthComb = len(cLin)
                 except KeyError:
                     depthComb = 0
-                stat.write("comb\t%s\t%s\t%i\n" % (readId, otuId, depthComb))
+                stat.write("comb\t%s\t%s\t%s\n" % (readId, otuId, str(depthComb)))
 
 
 rule its_perSampleOtuReads:
