@@ -832,9 +832,39 @@ rule final_classCompare:
                                                 combCls.get(otuId, "--")
                                                 )
                          )
-                stat.write("58S\t%s\t%i\n" % (otuId, len(otuCls58S.get(otuId, "").split(";"))))
-                stat.write("ITS2\t%s\t%i\n" % (otuId, len(itsClass.get(otuId, "").split(";"))))
-                stat.write("comb\t%s\t%i\n" % (otuId, len(combCls.get(otuId, "").split(";"))))
+                try:
+                    cls58S = otuCls58S[otuId]
+                    if cls58S == "unknown":
+                        depth58S = 0
+                    else:
+                        depth58S = len(cls58S.strip(";").split(";"))
+                except KeyError:
+                    depth58S = 0
+                stat.write("58S\t%s\t%s\t%i\n" % (readId, otuId, depth58S))
+                try:
+                    clsIts = itsClass[otuId]
+                    if clsIts == "unknown":
+                        depthIts = 0
+                    else:
+                        depthIts = len(clsIts.strip(";").split(";"))
+                except KeyError:
+                    depthIts = 0
+                stat.write("ITS2\t%s\t%s\t%i\n" % (readId, otuId, depthIts))
+                try:
+                    clsComb = combCls[otuId]
+                    if clsComb.strip(";") == "unknown":
+                        depthComb = 0
+                    else:
+                        cLin = clsComb.strip(";").split(";")
+                        if "|" in cLin[-1]:
+                            #conflicted 
+                            depthComb = "NA"
+                        else:
+                            depthComb = len(cLin)
+                except KeyError:
+                    depthComb = 0
+                stat.write("comb\t%s\t%s\t%i\n" % (readId, otuId, depthComb))
+
 
 rule its_perSampleOtuReads:
     input: otuReads="swarm/all.otuReads.tsv", sample="readInfo/sample_R1.tsv"
