@@ -562,10 +562,10 @@ rule its_alignToUnite:
 rule its_classify:
     input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta"
     output: "taxonomy/all.ITS2.otus.class.tsv"
-    params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=1.00
+    params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=.90
     log: "logs/its_class.log"
     run:
-        logOut = open(log, "w")
+        logOut = open(log[0], "w")
         classifi = {}
         itsLength = {}
         seqNr = 0
@@ -608,7 +608,7 @@ rule its_classify:
                     cutoff = 0
                     while cutoff < len(sortedHits) and sortedHits[cutoff][1] >= (1.0-topPerc)*sortedHits[0][1]:
                         cutoff += 1
-                    lineage = lca([hit[0] for hit in sortedHits[:cutoff]])
+                    lineage = lca([hit[0] for hit in sortedHits[:cutoff]], params.stringency)
                     out.write("%s\t%s\n" % (key, lineage))
         try:
             logOut.close()
