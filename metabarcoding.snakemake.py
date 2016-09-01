@@ -1163,7 +1163,7 @@ def lca(lineageStrings, stringency=1.0):
             if len(memberLin) <= i:
                 active[m] = False
                 continue #ignore lineages that are not this long
-            if memberLin[i].split("__")[-1] in ["unidentified", "unclassified", "unknown"]:
+            if memberLin[i].split("__")[-1] in ["unidentified", "unclassified", "unknown"] or name.startswith("Incertae"):
                 continue # ignoring unidentified entrys
             total += 1
             try:
