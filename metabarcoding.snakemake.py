@@ -1154,7 +1154,7 @@ def lca(lineageStrings, stringency=1.0):
     i=0
     maxLinLen = max([len(m) for m in mLineages])
     active = [True]*len(mLineages)
-    while i<maxLinLen:
+    for i in range(maxLinLen):
         total = 0.0
         counts = {}
         for m, memberLin in enumerate(mLineages):
@@ -1163,7 +1163,8 @@ def lca(lineageStrings, stringency=1.0):
             if len(memberLin) <= i:
                 active[m] = False
                 continue #ignore lineages that are not this long
-            if memberLin[i].split("__")[-1] in ["unidentified", "unclassified", "unknown"] or name.startswith("Incertae"):
+            name = memberLin[i].split("__")[-1]
+            if name in ["unidentified", "unclassified", "unknown"] or name.startswith("Incertae"):
                 continue # ignoring unidentified entrys
             total += 1
             try:
@@ -1184,7 +1185,6 @@ def lca(lineageStrings, stringency=1.0):
                     active[m] = False
         else:
             break
-        i += 1
     if len(lineage) == 0:
         lineage = ["unknown"]
     return ";".join(lineage)
