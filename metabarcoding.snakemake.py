@@ -597,7 +597,7 @@ rule its_classify:
         logOut.write("%i alignmetns for %i sequences\n" % (total, seqNr))
         logOut.write("%i excluded, because e-value was higher than %e\n" % (evalueFilter, params.maxE))
         logOut.write("%i excluded, because identity was lower than %d%%\n" % (identFilter, params.minIdent))
-        logOut.write("%i excluded, because coverage was lower than %d%%\n" % (evalueFilter, params.minCov))
+        logOut.write("%i excluded, because coverage was lower than %d%%\n" % (covFilter, params.minCov))
         topPerc = params.topPerc/100.0
         with open(output[0], "w") as out:
             for key, hits in classifi.items():
