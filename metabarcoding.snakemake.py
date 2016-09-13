@@ -615,9 +615,9 @@ rule its_classify:
         except:
             pass
 
-rule its_readClassification:
-    input: tax="taxonomy/all.ITS2.otus.class.tsv", otuList="swarm/all.ITS2.otus.out", repIts="readInfo/all.repITS2.tsv", repSeq="readInfo/all.repseq.tsv"
-    output: cls="taxonomy/all.ITS2.classification.tsv", otuReads="swarm/all.otuReads.tsv"
+rule createOtuReads:
+    input: otuList="swarm/all.ITS2.otus.out", repIts="readInfo/all.repITS2.tsv", repSeq="readInfo/all.repseq.tsv"
+    output: "swarm/all.otuReads.tsv"
     run:
         repSeq = {}
         for line in open(input.repSeq):
@@ -637,30 +637,40 @@ rule its_readClassification:
         for line in open(input.otuList):
             memSeqs = line.strip().split(" ")
             otu[memSeqs[0].strip(";").split(";")[0]] = [s.split("|")[0] for s in memSeqs]
-
-        readClass = {}
-        with open(output.otuReads, "w") as otuOut:
-            for line in open(input.tax):
-                otuName, classification = line.strip().split("\t")
-                otuId, sizeStr = otuName.strip(";").split(";")
-                count = int(sizeStr.split("=")[1])
-                cls = []
-                for entry in classification.strip(";").split(";"):
-                    if entry == "unclassified":
-                        break
-                    elif entry == "unknown":
-                        cls = [""]
-                    else:
-                        cls.append(entry)
-                i=0
+        with open(output[0], "w") as otuOut:
+            for otuId in otu.keys():
                 for itsSeq in otu[otuId]:
                     for repSeqId in repIts[itsSeq]:
                         for read in repSeq[repSeqId]:
-                            readClass[read] = ";".join(cls)
-                            i+=1
                             otuOut.write("%s\t%s\n" % (otuId, read))
-                assert i==count
-        
+
+rule its_readClassification:
+    input: tax="taxonomy/all.ITS2.otus.class.tsv", otuList="swarm/all.ITS2.otus.out", otuReads="swarm/all.otuReads.tsv"
+    output: cls="taxonomy/all.ITS2.classification.tsv"
+    run:
+        otuReads = {}
+        for line in open(input.otuReads):
+            otuId, readId = line.strip().split("\t")
+            try:
+                otuReads[otuId].append(readId)
+            except KeyError:
+                otuReads[otuId] = [readId]
+        readClass = {}
+        for line in open(input.tax):
+            otuName, classification = line.strip().split("\t")
+            otuId, sizeStr = otuName.strip(";").split(";")
+            count = int(sizeStr.split("=")[1])
+            assert len(otuReads[otuId]) == count
+            cls = []
+            for entry in classification.strip(";").split(";"):
+                if entry == "unclassified":
+                    break
+                elif entry == "unknown":
+                    cls = [""]
+                else:
+                    cls.append(entry)
+            for read in otuReads[otuId]:
+                readClass[read] = ";".join(cls)
         with open(output.cls, "w") as out:
             for read, cls in readClass.items():
                 out.write("%s\t%s\n" % (read, cls))
