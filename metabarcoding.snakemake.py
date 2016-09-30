@@ -1153,7 +1153,9 @@ class TaxTreeNode(object):
         return lines
 
 
-def lca(lineageStrings, stringency=1.0):
+def lca(lineageStrings, stringency=1.0, 
+        unidentified=["unidentified", "unclassified", "unknown"],
+        ignoreIncertaeSedis=True):
     lineage = []
     mLineages = []
     #remove bootstrap values ("(100)", "(75)", etc.) if any
@@ -1174,8 +1176,11 @@ def lca(lineageStrings, stringency=1.0):
                 active[m] = False
                 continue #ignore lineages that are not this long
             name = memberLin[i].split("__")[-1]
-            if name in ["unidentified", "unclassified", "unknown"] or name.startswith("Incertae"):
+            if name in unidentified:
                 continue # ignoring unidentified entrys
+            if ignoreIncertaeSedis and name.startswith("Incertae"):
+                continue # ignoring Incertae sedis entries.
+                         # NOTE: this will mean lineages end at the first Incerta sedis
             total += 1
             try:
                 counts[memberLin[i]] += 1
