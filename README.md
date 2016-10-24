@@ -48,8 +48,7 @@ For each software that is used during pipeline execution there is an entry that 
 In addition to the software paths there are the following entries that give information about your run:
 
 1. dbFolder: the name of the folder you created to hold your databases (step 3. in the last section)
-2. samples: a list of key-value pairs describing your data. The list is enclosed by "{" and each entry is separated by a ",". They key gives the sample ID as it was used used in the sequencing run (what the files are called), while the value gives the names you want the samples identified by in the final result. Example:
-   > {"A1_S1": "lake1_sample1", "A3_S2": "lake1_sample2", "B12_S3": "lake2_sample1"}
+2. samples: a list of key-value pairs describing your data. The list is enclosed by "{" and each entry is separated by a ",". They key gives the sample ID as it was used used in the sequencing run (what the files are called), while the value gives the names you want the samples identified by in the final result. Example: `{"A1_S1": "lake1_sample1", "A3_S2": "lake1_sample2", "B12_S3": "lake2_sample1"}`
 3. forward_primer: the sequence of your forward amplification primer
 4. reverse_primer: the sequence of your reverse amplification primer
 
