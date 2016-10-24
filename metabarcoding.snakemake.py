@@ -28,9 +28,17 @@ include: "generate58SDatabase.snakefile.py"
 
 ################ generate lamda db from UNTIE ##################################
 
+rule db_getUniteFile:
+    output: "%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta" % config
+    shell:
+        "cd %(dbFolder)s;" \
+        "wget https://unite.ut.ee/sh_files/sh_general_release_22.08.2016.zip;" \
+        "unzip sh_general_release_22.08.2016.zip;" \
+        "rm sh_general_release_22.08.2016.zip" % config
+
 rule db_creatUniteIndex:
-    input: "%(dbFolder)s/UNITE_public_31.01.2016.ascii.good.fasta" % config
-    output: touch("dbs/UNITE_public_31.01.2016.ascii.fasta.lambdaIndexCreated")
+    input: "%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta" % config
+    output: touch("%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta.lambdaIndexCreated" % config)
     threads: 6
     shell:
         "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
