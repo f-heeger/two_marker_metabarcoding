@@ -53,6 +53,15 @@ In addition to the software paths there are the following entries that give info
 4. **forward_primer**: the sequence of your forward amplification primer
 5. **reverse_primer**: the sequence of your reverse amplification primer
 
+# Configuration
+
+The config file also contains optional configurations, which can be used to change the behavior of the pipeline.
+
+* **conflictBehavior** This parameter defines what the pipeline will do if the 5.8S and ITS2 classifications differ from each other. There are three possible values:
+  1. `mark`: The conflict is marked in the classification with an entry of the form: <ITS classification>|<5.8S classification>
+  2. `5.8S`: Use the 5.8S classification and ignore the ITS classification
+  3. `ITS`: Use the ITS2 classification and ignore the 5.8S classification
+
 # Running the pipeline
 
 * Open a terminal and navigate to your working directory.

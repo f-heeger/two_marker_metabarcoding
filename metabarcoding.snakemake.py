@@ -24,7 +24,7 @@ rule all:
 
 ################ generate reference sequence for 5.8S ##########################
 
-include: "generate58SDatabase.snakefile.py"
+#include: "generate58SDatabase.snakefile.py"
 
 ################ generate lamda db from UNTIE ##################################
 
@@ -763,6 +763,15 @@ rule final_combineClassification:
     input: itsCls="taxonomy/all.ITS2.otus.class.tsv", r58sCls="taxonomy/all_ITS2.otus_5.8sClass.tsv"
     output: otuComb="taxonomy/all.ITS2.otus.combClass.tsv", conflict="taxonomy/all.ITS2.otus.conflictingClass.tsv"
     run:
+        if config["conflictBehavior"] == "mark":
+            ifConf = 0
+        elif config["conflictBehavior"] == "5.8S":
+            ifConf = 1
+        elif config["conflictBehavior"] == "ITS":
+            ifConf = 2
+        else:
+            raise RuntimeError('unknown conflict behavior setting: "%s". Please change the conflict behavior in the config file to "mark", "ITS" or "5.8S".' % config["conflictBehavior"])
+
         tsu = {}
         for line in open(input.r58sCls):
             name, lin, number = line.strip("\n").split("\t")
@@ -784,8 +793,13 @@ rule final_combineClassification:
                         out.write("%s\t%s;\n" % (name, ";".join(tsuLin)))
                     else:
                         #if this is not the cas this is a conflict at the first level:
-                        # write it! (nothing else has to be done)
-                        out.write("%s\t%s|%s\n" % (name,lin[0],tsuLin[0]))
+                        # act accordingly (nothing else has to be done)
+                        if ifConf==0:
+                            out.write("%s\t%s|%s\n" % (name, lin[0], tsuLin[0]))
+                        elif ifConf==1:
+                            out.write("%s\t%s\n" % (name, ";".join(tsuLin)))
+                        else:
+                            out.write("%s\t%s\n" % (name, ";".join(lin)))
                         try:
                             conflict[(lin[0], tsuLin[0])] += 1
                         except:
@@ -800,7 +814,12 @@ rule final_combineClassification:
                         out.write("%s\t%s;\n" % (name, ";".join(lin)))
                     else:
                         #otherwise write the the conflict and stop there
-                        out.write("%s\t%s|%s\n" % (name,lin[0],tsuLin[0]))
+                        if ifConf==0:
+                            out.write("%s\t%s|%s\n" % (name, lin[0], tsuLin[0]))
+                        elif ifConf==1:
+                            out.write("%s\t%s\n" % (name, ";".join(tsuLin)))
+                        else:
+                            out.write("%s\t%s\n" % (name, ";".join(lin)))
                         try:
                             conflict[(lin[0], tsuLin[0])] += 1
                         except:
@@ -813,8 +832,9 @@ rule final_combineClassification:
                         # (including all levels after the second)
                         out.write("%s\t%s\n" % (name, linStr))
                     else:
-                        #otherwise write the classifcation untill the conflict occurs
-                        # and write the conflict and stop there
+                        #otherwise write the classifcation
+                        # if a conflict occurs and the 'mark' conflict behavior is used
+                        # mark the conflict and truncate the classification on that level
                         # This is writen for a general case, but the conflict can 
                         # only occut in the first two levels, because we ignore the
                         # 5.8S after that.
@@ -823,8 +843,13 @@ rule final_combineClassification:
                             if a == b:
                                 comLin.append(a)
                             else:
-                                comLin.append("%s|%s" % (a,b))
-                                break
+                                if ifConf==0:
+                                    comLin.append("%s|%s" % (a,b))
+                                    break
+                                elif ifConf==1:
+                                    comLin.append(b)
+                                else:
+                                    comLin.append(a)
                         out.write("%s\t%s;\n" % (name, ";".join(comLin)))
                         try:
                             conflict[(";".join(lin[:2]), ";".join(tsuLin[:2]))] += 1
