@@ -287,7 +287,7 @@ rule init_readNumberOverview:
 rule init_dereplicate:
     input: "merged/all.fasta"
     output: fasta="init_derep/all.derep.fasta", tsv="readInfo/all.repseq.tsv", txt="init_derep/all.uc.txt"
-    log: "logs/all_rep58S.log"
+    log: "logs/all_repSeq.log"
     run:
         shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizeout --log {log}" % config)
         with open(output.tsv, "w") as out:
@@ -375,7 +375,7 @@ rule r58S_dereplicate:
     """dereplicate 5.8S sequences and only retain "clusters" with more than one sequence"""
     input: "primerremoved/all.5_8S_primerRemoved.fasta"
     output: fasta="mothur/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
-    log: "logs/all_repSeq.log"
+    log: "logs/all_rep58S.log"
     params: minsize=2
     run:
         shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}" % config)
