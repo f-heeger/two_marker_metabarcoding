@@ -47,10 +47,20 @@ For each software that is used during pipeline execution there is an entry that 
 
 In addition to the software paths there are the following entries that give information about your run:
 
-1. dbFolder: the name of the folder you created to hold your databases (step 3. in the last section)
-2. samples: a list of key-value pairs describing your data. The list is enclosed by "{" and each entry is separated by a ",". They key gives the sample ID as it was used used in the sequencing run (what the files are called), while the value gives the names you want the samples identified by in the final result. Example: `{"A1_S1": "lake1_sample1", "A3_S2": "lake1_sample2", "B12_S3": "lake2_sample1"}`
-3. forward_primer: the sequence of your forward amplification primer
-4. reverse_primer: the sequence of your reverse amplification primer
+1. **inFolder**: the absolut path to the folder that contains the fastq files of the raw reads (after demultiplexing)
+2. **dbFolder**: the name of the folder you created to hold your databases (step 3. in the last section)
+3. **samples**: a list of key-value pairs describing your data. The list is enclosed by "{" and each entry is separated by a ",". They key gives the sample ID as it was used used in the sequencing run (what the files are called), while the value gives the names you want the samples identified by in the final result. Example: `{"A1_S1": "lake1_sample1", "A3_S2": "lake1_sample2", "B12_S3": "lake2_sample1"}`
+4. **forward_primer**: the sequence of your forward amplification primer
+5. **reverse_primer**: the sequence of your reverse amplification primer
+
+# Configuration
+
+The config file also contains optional configurations, which can be used to change the behavior of the pipeline.
+
+* **conflictBehavior** This parameter defines what the pipeline will do if the 5.8S and ITS2 classifications differ from each other. There are three possible values:
+  1. `mark`: The conflict is marked in the classification with an entry of the form: <ITS classification>|<5.8S classification>
+  2. `5.8S`: Use the 5.8S classification and ignore the ITS classification
+  3. `ITS`: Use the ITS2 classification and ignore the 5.8S classification
 
 # Running the pipeline
 
