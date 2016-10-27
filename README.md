@@ -65,4 +65,4 @@ The config file also contains optional configurations, which can be used to chan
 # Running the pipeline
 
 * Open a terminal and navigate to your working directory.
-* type the following command: `snakemake -s metabacoding.snakemake.py -j 6` where "6" is the number of processors to use
+* type the following command: `snakemake -s metabarcoding.snakemake.py -j 6` where "6" is the number of processors to use
