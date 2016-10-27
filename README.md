@@ -58,10 +58,12 @@ In addition to the software paths there are the following entries that give info
 The config file also contains optional configurations, which can be used to change the behavior of the pipeline.
 
 * **conflictBehavior** This parameter defines what the pipeline will do if the 5.8S and ITS2 classifications differ from each other. There are three possible values:
-  1. `mark`: The conflict is marked in the classification with an entry of the form: <ITS classification>|<5.8S classification>
-  2. `5.8S`: Use the 5.8S classification and ignore the ITS classification
-  3. `ITS`: Use the ITS2 classification and ignore the 5.8S classification
+    1. `mark`: The conflict is marked in the classification with an entry of the form: <ITS classification>|<5.8S classification>
+    2. `5.8S`: Use the 5.8S classification and ignore the ITS classification
+    3. `ITS`: Use the ITS2 classification and ignore the 5.8S classification
 * **primerError** How many errors should be allowed when checking if forward and reverse primer are present.
+* **maxAmplLen** Maximum length of amplicons without the amplification primers. Will be passed to pears `-m` option.
+* **minAmplLen** Minimum length of amplicons without the amplification primers. Will be passed to pears `-n` option.
 
 # Running the pipeline
 
