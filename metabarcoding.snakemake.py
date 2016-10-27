@@ -102,6 +102,8 @@ rule init_filterByBarcodeQuality:
     output: "raw/all_goodIndex_R1.fastq.gz", "raw/all_goodIndex_R2.fastq.gz"
     log: "logs/all_indexQualFilter.log"
     run:
+        total=0
+        written=0
         with gzip.open(output[0], "wt") as out1, gzip.open(output[1], "wt") as out2:
             with gzip.open(input.read1, "rt") as read1File, gzip.open(input.read2, "rt") as read2File, gzip.open(input.index1, "rt") as index1File, gzip.open(input.index2, "rt") as index2File:
                 read1 = SeqIO.parse(read1File, "fastq")
@@ -116,11 +118,15 @@ rule init_filterByBarcodeQuality:
                     r2 = next(read2)
                     i1 = next(index1)
                     i2 = next(index2)
+                    total += 1
                     minQi1 = min(i1._per_letter_annotations["phred_quality"])
                     minQi2 = min(i2._per_letter_annotations["phred_quality"])
                     if min(minQi1, minQi2) >= 20:
                         out1.write(r1.format("fastq"))
                         out2.write(r2.format("fastq"))
+                        written += 1
+        open(log[0], "w").write("%i of %i remain after index filtering (%.2f%%)" % (written, total, float(written)/total*100))
+
 
 rule init_indexQualityReadNumbers:
     input: reads="raw/all_goodIndex_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
@@ -147,7 +153,7 @@ rule init_filterPrimer:
     log: "logs/all_flexbar.log"
     threads: 6
     shell:
-        "echo \">ITS\n%(forward_primer)s\" > primers/fwd_primer.fasta; echo \">ITS\n%(reverse_primer)s\" > primers/rev_primer.fasta; %(flexbar)s -n {threads} -r {input.read1} -p {input.read2} -t primers/all -b primers/fwd_primer.fasta -b2 primers/rev_primer.fasta -bk -be LEFT_TAIL -bn 25 -bt 1.0 -f i1.8 -u 100 -z GZ &> {log}" % config
+        "echo \">ITS\n%(forward_primer)s\" > primers/fwd_primer.fasta; echo \">ITS\n%(reverse_primer)s\" > primers/rev_primer.fasta; %(flexbar)s -n {threads} -r {input.read1} -p {input.read2} -t primers/all -b primers/fwd_primer.fasta -b2 primers/rev_primer.fasta -bk -be LEFT_TAIL -bn 25 -bt %(primerErr)f -f i1.8 -u 100 -z GZ &> {log}" % config
 
 rule init_primerReadNumbers:
     input: reads="primers/all_barcode_ITS-ITS_1.fastq.gz", sample="readInfo/sample_R1.tsv"
@@ -171,10 +177,11 @@ rule init_primerReadNumbers:
 rule init_trimming:
     input: r1="primers/all_barcode_ITS-ITS_1.fastq.gz", r2="primers/all_barcode_ITS-ITS_2.fastq.gz"
     output: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
+    log: "logs/all_timming.log"
     threads: 3
     params: windowLen=8, minQual=20, minLen=200, avgQual=30
     shell:
-        "java -jar %(trimmomatic)s PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual}" % config
+        "java -jar %(trimmomatic)s PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual} &> {log}" % config
 
 #rule init_trimmStats:
 #    input: "logs/{sample}_trimmomatic.log"
