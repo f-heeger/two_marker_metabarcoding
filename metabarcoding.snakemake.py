@@ -102,8 +102,8 @@ rule init_filterByBarcodeQuality:
     output: "raw/all_goodIndex_R1.fastq.gz", "raw/all_goodIndex_R2.fastq.gz"
     log: "logs/all_indexQualFilter.log"
     run:
-        total=0
-        written=0
+        total = 0
+        written = 0
         with gzip.open(output[0], "wt") as out1, gzip.open(output[1], "wt") as out2:
             with gzip.open(input.read1, "rt") as read1File, gzip.open(input.read2, "rt") as read2File, gzip.open(input.index1, "rt") as index1File, gzip.open(input.index2, "rt") as index2File:
                 read1 = SeqIO.parse(read1File, "fastq")
