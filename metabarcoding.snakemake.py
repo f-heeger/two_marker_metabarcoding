@@ -173,7 +173,7 @@ rule init_merge:
     threads: 3
     log: "logs/all_pear.log"
     shell:
-        "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n {minAmplLen} -m {maxAmplLen} -v {params.minOverlap} &> {log}" % config
+        "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n %(minAmplLen)s -m %(maxAmplLen)s -v {params.minOverlap} &> {log}" % config
 
 rule init_convertMerged:
     input: "merged/all.assembled.fastq"
