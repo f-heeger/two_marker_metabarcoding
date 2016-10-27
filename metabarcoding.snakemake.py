@@ -97,58 +97,8 @@ rule qc_readCounts:
                 seqNum = int(float(arr[-2]))
                 out.write("%s\t%i\n" % (sample, seqNum))
 
-rule init_filterByBarcodeQuality:
-    input: read1="raw/all_R1.fastq.gz", read2="raw/all_R2.fastq.gz", index1="raw/all_I1.fastq.gz", index2="raw/all_I2.fastq.gz"
-    output: "raw/all_goodIndex_R1.fastq.gz", "raw/all_goodIndex_R2.fastq.gz"
-    log: "logs/all_indexQualFilter.log"
-    run:
-        total=0
-        written=0
-        with gzip.open(output[0], "wt") as out1, gzip.open(output[1], "wt") as out2:
-            with gzip.open(input.read1, "rt") as read1File, gzip.open(input.read2, "rt") as read2File, gzip.open(input.index1, "rt") as index1File, gzip.open(input.index2, "rt") as index2File:
-                read1 = SeqIO.parse(read1File, "fastq")
-                read2 = SeqIO.parse(read2File, "fastq")
-                index1 = SeqIO.parse(index1File, "fastq")
-                index2 = SeqIO.parse(index2File, "fastq")
-                while True:
-                    try:
-                        r1 = next(read1)
-                    except StopIteration:
-                        break
-                    r2 = next(read2)
-                    i1 = next(index1)
-                    i2 = next(index2)
-                    total += 1
-                    minQi1 = min(i1._per_letter_annotations["phred_quality"])
-                    minQi2 = min(i2._per_letter_annotations["phred_quality"])
-                    if min(minQi1, minQi2) >= 20:
-                        out1.write(r1.format("fastq"))
-                        out2.write(r2.format("fastq"))
-                        written += 1
-        open(log[0], "w").write("%i of %i remain after index filtering (%.2f%%)" % (written, total, float(written)/total*100))
-
-
-rule init_indexQualityReadNumbers:
-    input: reads="raw/all_goodIndex_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
-    output: "readNumbers/indexQualityReadNumbers.tsv"
-    run:
-        readSample = {}
-        for line in open(input.sample):
-            read, sample = line.strip("\n").split("\t")
-            readSample[read] = sample
-        sampleReads = {}
-        for rec in SeqIO.parse(gzip.open(input.reads, "rt"), "fastq"):
-            sample = readSample[rec.id]
-            try:
-                sampleReads[sample] += 1
-            except KeyError:
-                sampleReads[sample] = 1
-        with open(output[0], "w") as out:
-            for sample, value in sampleReads.items():
-                out.write("%s\t%s\n" % (sample, value))
-
 rule init_filterPrimer:
-    input: read1="raw/all_goodIndex_R1.fastq.gz", read2="raw/all_goodIndex_R2.fastq.gz"
+    input: read1="raw/all_R1.fastq.gz", read2="raw/all_R2.fastq.gz"
     output: "primers/all_barcode_ITS-ITS_1.fastq.gz", "primers/all_barcode_ITS-ITS_2.fastq.gz"
     log: "logs/all_flexbar.log"
     threads: 6
@@ -219,11 +169,11 @@ rule init_trimmedReadNumbers:
 rule init_merge:
     input: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
     output: "merged/all.assembled.fastq"
-    params: minLen=300, maxLen=550, minOverlap=10
+    params: minOverlap=10
     threads: 3
     log: "logs/all_pear.log"
     shell:
-        "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n {params.minLen} -m {params.maxLen} -v {params.minOverlap} &> {log}" % config
+        "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n {minAmplLen} -m {maxAmplLen} -v {params.minOverlap} &> {log}" % config
 
 rule init_convertMerged:
     input: "merged/all.assembled.fastq"
@@ -567,7 +517,7 @@ rule its_clustering:
 
 
 rule its_alignToUnite:
-    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/UNITE_public_31.01.2016.ascii.good.fasta" % config, dbFlag="%(dbFolder)s/UNITE_public_31.01.2016.ascii.fasta.lambdaIndexCreated" % config
+    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta.lambdaIndexCreated" % config
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3

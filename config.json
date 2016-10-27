@@ -113,5 +113,7 @@
     "forward_primer": "AACCAWCGATGAAGAACGCAG",
     "reverse_primer": "AATCCTCCGCTTAYTRATATGC",
     "conflictBehavior": "mark",
-    "primerErr": 3
+    "primerErr": 3,
+    "minAmplLen": 50,
+    "maxAmplLen": 550
 }
