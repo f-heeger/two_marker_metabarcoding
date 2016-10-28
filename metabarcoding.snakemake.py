@@ -809,11 +809,11 @@ rule final_combineClassification:
                         #if this is not the cas this is a conflict at the first level:
                         # act accordingly (nothing else has to be done)
                         if ifConf==0:
-                            out.write("%s\t%s|%s\n" % (name, lin[0], tsuLin[0]))
+                            out.write("%s\t%s|%s;\n" % (name, lin[0], tsuLin[0]))
                         elif ifConf==1:
-                            out.write("%s\t%s\n" % (name, ";".join(tsuLin)))
+                            out.write("%s\t%s;\n" % (name, ";".join(tsuLin)))
                         else:
-                            out.write("%s\t%s\n" % (name, ";".join(lin)))
+                            out.write("%s\t%s;\n" % (name, ";".join(lin)))
                         try:
                             conflict[(lin[0], tsuLin[0])] += 1
                         except:
@@ -829,11 +829,11 @@ rule final_combineClassification:
                     else:
                         #otherwise write the the conflict and stop there
                         if ifConf==0:
-                            out.write("%s\t%s|%s\n" % (name, lin[0], tsuLin[0]))
+                            out.write("%s\t%s|%s;\n" % (name, lin[0], tsuLin[0]))
                         elif ifConf==1:
-                            out.write("%s\t%s\n" % (name, ";".join(tsuLin)))
+                            out.write("%s\t%s;\n" % (name, ";".join(tsuLin)))
                         else:
-                            out.write("%s\t%s\n" % (name, ";".join(lin)))
+                            out.write("%s\t%s;\n" % (name, ";".join(lin)))
                         try:
                             conflict[(lin[0], tsuLin[0])] += 1
                         except:
@@ -844,7 +844,7 @@ rule final_combineClassification:
                     if lin[:2] == tsuLin[:2]:
                         #if they are the same accept the ITS classification
                         # (including all levels after the second)
-                        out.write("%s\t%s\n" % (name, linStr))
+                        out.write("%s\t%s;\n" % (name, linStr))
                     else:
                         #otherwise write the classifcation
                         # if a conflict occurs and the 'mark' conflict behavior is used
@@ -1089,7 +1089,7 @@ rule final_kronaPrepStep1:
         data = {"$": []}
         for line in open(input.tax):
             name, linStr = line.strip("\n").split("\t")
-            lin = linStr.split(";")
+            lin = linStr.strip(";").split(";")
             if name not in otuCount:
                 #not all OTUs are in all samples
                 continue
