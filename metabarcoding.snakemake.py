@@ -726,6 +726,13 @@ rule its_get58sClassifications:
                     lcaStr =  lca(otuCls, params.stringency)
                     lcPhylum = ";".join(lcaStr.split(";")[:2]) #trim the lineage down to phylum (2. level)
                     out.write("%s\t%s\t%i\n" % (otu, lcPhylum, len(otuCls)))
+                    otuClsCount = {}
+                    for cls in otuCls:
+                        try:
+                            otuClsCount[cls] += 1
+                        except KeyError:
+                            otuClsCount[cls] = 1
+                    logFile.write("%s\t%s\n" % (otu, otuClsCount))
                 else:
                     out.write("%s\tunknown\t0\n" % (otu))
 
