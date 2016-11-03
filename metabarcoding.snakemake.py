@@ -724,9 +724,9 @@ rule its_get58sClassifications:
                     except KeyError:
                         logFile.write("No 5.8S classification for read %s.\n" % readId)
                 if otuCls:
-                    lcaStr =  lca(otuCls, params.stringency, unidentified=["unclassified", "unknown"])
-                    lcPhylum = ";".join(lcaStr.split(";")[:2]) #trim the lineage down to phylum (2. level)
-                    out.write("%s\t%s\t%i\n" % (otu, lcPhylum, len(otuCls)))
+                    lcaStr =  lca(otuCls, params.stringency, unidentified=["unidentified", "unclassified", "unknown"])
+#                    lcPhylum = ";".join(lcaStr.split(";"))
+                    out.write("%s\t%s\t%i\n" % (otu, lcaStr, len(otuCls)))
                     otuClsCount = {}
                     for cls in otuCls:
                         try:
