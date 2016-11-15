@@ -774,6 +774,29 @@ rule its_krona:
     shell:
         "%(ktImportText)s -o {output} {input}" % config
 
+rule final_concatMarkers:
+    input: otus="swarm/all.ITS2.otus.fasta", tsu="primerremoved/all.5_8S_primerRemoved.fasta"
+    output: "all.concatMarkers.fasta"
+    log: "logs/all.concatMarker.log"
+    run:
+        r58s = {}
+        for r in SeqIO.parse(open(input.tsu), "fasta"):
+            r58s[r.id.split("|", 1)[0]] = r
+        notFound = 0
+        with open(output[0], "w") as out, open(log[0], "w") as logStream:
+            for otu in SeqIO.parse(open(input.otus), "fasta"):
+                newId = otu.id.split("|", 1)[0]
+                try:
+                    tsu = r58s[newId]
+                except KeyError:
+                    logStream.write("Did not find 5.8S for %s\n" % newId)
+                    notFound += 1
+                concat = tsu + otu
+                concat.id = "%s|partial5.8S+ITS2" % newId
+                concat.description = ""
+                out.write(concat.format("fasta"))
+        print("Could not find 5.8S for %i OTUs. See %s for details." % (notFound, log[0]))
+
 rule final_combineClassification:
     input: itsCls="taxonomy/all.ITS2.otus.class.tsv", r58sCls="taxonomy/all_ITS2.otus_5.8sClass.tsv"
     output: otuComb="taxonomy/all.ITS2.otus.combClass.tsv", conflict="taxonomy/all.ITS2.otus.conflictingClass.tsv"
