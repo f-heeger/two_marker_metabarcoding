@@ -4,6 +4,7 @@
 
 * Python 3.x
 * BioPython
+* rpy2
 * snakemake (version 3.5.4 or newer)
 
 ## External Software
@@ -19,7 +20,7 @@
 * [Pear](http://sco.h-its.org/exelixis/web/software/pear/)
 * [Krona](https://github.com/marbl/Krona/wiki/KronaTools)
 * [swarm](https://github.com/torognes/swarm)
-* [Lambda](http://seqan.github.io/lambda/)
+* [Lambda](http://seqan.github.io/lambda/) version 0.9 or 1.0 (the 1.9.* version is not supported yet)
 
 ## Reference Databases
 
