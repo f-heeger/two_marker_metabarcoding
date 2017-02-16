@@ -29,16 +29,16 @@ rule all:
 ################ generate lamda db from UNTIE ##################################
 
 rule db_getUniteFile:
-    output: "%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta" % config
+    output: "%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config
     shell:
         "cd %(dbFolder)s;" \
-        "wget https://unite.ut.ee/sh_files/sh_general_release_22.08.2016.zip;" \
-        "unzip sh_general_release_22.08.2016.zip;" \
-        "rm sh_general_release_22.08.2016.zip" % config
+        "wget https://unite.ut.ee/sh_files/sh_general_release_%(uniteVersion)s.zip;" \
+        "unzip sh_general_release_%(uniteVersion)s.zip;" \
+        "rm sh_general_release_%(uniteVersion)s.zip" % config
 
 rule db_creatUniteIndex:
-    input: "%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta" % config
-    output: touch("%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta.lambdaIndexCreated" % config)
+    input: "%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config
+    output: touch("%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta.lambdaIndexCreated" % config)
     threads: 6
     shell:
         "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
@@ -568,7 +568,7 @@ rule its_clustering:
 
 
 rule its_alignToUnite:
-    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_22.08.2016.fasta.lambdaIndexCreated" % config
+    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta.lambdaIndexCreated" % config
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3
