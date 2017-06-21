@@ -375,7 +375,7 @@ rule r58S_removePrimerAndNs:
 rule r58S_dereplicate:
     """dereplicate 5.8S sequences and only retain "clusters" with more than one sequence"""
     input: "primerremoved/all.5_8S_primerRemoved.fasta"
-    output: fasta="mothur/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
+    output: fasta="r58S_derep/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
     log: "logs/all_rep58S.log"
     params: minsize=2
     run:
@@ -403,25 +403,72 @@ rule r58S_dereplicate:
                 if clusterSize[cluster] >= params.minsize:
                     out.write("%s\t%s\n" % (seq, cluster))
 
-rule r58S_align:
-    input: reads="mothur/all.5_8S_derep.fasta", db="%(dbFolder)s/UNITE.5_8S.aln" % config
-    output: align="mothur/all.5_8S_derep.align", report="mothur/all.5_8S_derep.align.report"
+rule r58S_alignToUnite:
+    input: otus="r58S_derep/all.5_8S_derep.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta.lambdaIndexCreated" % config
+    output: "lambda/all.58S.derep_vs_UNITE.m8"
+    log: "logs/all_58s_lambda.log"
     threads: 3
-    log: "logs/58S_mothur.log"
     shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); align.seqs(candidate={input.reads}, template={input.db}, processors={threads});\" > /dev/null" % config
-        
-rule r58S_classify:
-    input: aln="mothur/all.5_8S_derep.align", ref="%(dbFolder)s/UNITE.5_8S.aln" % config, tax="%(dbFolder)s/UNITE.5_8S.tax" % config
-    output: "mothur/all.5_8S_derep.5_8S.wang.taxonomy", "mothur/all.5_8S_derep.5_8S.wang.tax.summary"
-    log: "logs/58s_mothur.log"
-    params: cutoff=60
-    shell:
-        "%(mothur)s -q \"#set.logfile(name={log}, append=T); classify.seqs(fasta={input.aln}, template={input.ref}, taxonomy={input.tax}, processors={threads}, cutoff={params.cutoff});\" > /dev/null" % config
+        "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
 
+rule r58S_classify:
+    input: lam="lambda/all.58S.derep_vs_UNITE.m8", otus="r58S_derep/all.5_8S_derep.fasta"
+    output: "taxonomy/all.58S.derep.class.tsv"
+    params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=.90
+    log: "logs/58s_class.log"
+    run:
+        logOut = open(log[0], "w")
+        classifi = {}
+        itsLength = {}
+        seqNr = 0
+        total = 0
+        evalueFilter = 0
+        identFilter = 0
+        covFilter = 0
+        for rec in SeqIO.parse(open(input.otus), "fasta"):
+            seqNr += 1
+            classifi[rec.id] = []
+            itsLength[rec.id.split("|",1)[0]] = len(rec)
+        for line in open(input.lam, encoding="latin-1"):
+            total +=1
+            qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
+            readId = qseqid.split("|",1)[0]
+            if float(evalue) > params.maxE:
+                evalueFilter += 1
+                continue
+            if float(pident) < params.minIdent:
+                identFilter +=1
+                continue
+            if float(length)/itsLength[readId]*100 < params.minCov:
+                covFilter += 1
+                continue
+            linStr = sseqid.rsplit("|", 1)[-1]
+            if linStr.endswith("Incertae"):
+                linStr += "_sedis" #FIXME: workaroud for taking the tayonomy from the fasta header which ends at a space. Wither fix fasta headers or take taxonomy from UNITE taxonomy file
+            classifi[qseqid].append((linStr, float(bitscore)))
+        logOut.write("%i alignmetns for %i sequences\n" % (total, seqNr))
+        logOut.write("%i excluded, because e-value was higher than %e\n" % (evalueFilter, params.maxE))
+        logOut.write("%i excluded, because identity was lower than %d%%\n" % (identFilter, params.minIdent))
+        logOut.write("%i excluded, because coverage was lower than %d%%\n" % (covFilter, params.minCov))
+        topPerc = params.topPerc/100.0
+        with open(output[0], "w") as out:
+            for key, hits in classifi.items():
+                if not hits:
+                    out.write("%s\tunknown\n" % (key))
+                else:
+                    sortedHits = sorted(hits, key=lambda x: x[1])[::-1]
+                    cutoff = 0
+                    while cutoff < len(sortedHits) and sortedHits[cutoff][1] >= (1.0-topPerc)*sortedHits[0][1]:
+                        cutoff += 1
+                    lineage = lca([hit[0] for hit in sortedHits[:cutoff]], params.stringency)
+                    out.write("%s\t%s\n" % (key, lineage))
+        try:
+            logOut.close()
+        except:
+            pass
 
 rule r58S_readClassification:
-    input: tax="mothur/all.5_8S_derep.5_8S.wang.taxonomy", repseq="readInfo/all.repseq.tsv", rep58s="readInfo/all.rep58S.tsv", sample="readInfo/sample_R1.tsv"
+    input: tax="taxonomy/all.58S.derep.class.tsv", repseq="readInfo/all.repseq.tsv", rep58s="readInfo/all.rep58S.tsv", sample="readInfo/sample_R1.tsv"
     output: "taxonomy/all_5_8S_classification.tsv"
     run:
         repseq = {}
@@ -451,13 +498,7 @@ rule r58S_readClassification:
                 elif entry == "unknown":
                     cls = [""]
                 else:
-                    try:
-                        name, _ = entry.split("(")
-                    except ValueError:
-                        print(entry)
-                        print(line)
-                        raise
-                    cls.append(name)
+                    cls.append(entry)
             i=0
             for r58seq in rep58s[rId]:
                 for read in repseq[r58seq.split("|")[0]]:
