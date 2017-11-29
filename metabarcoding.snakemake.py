@@ -24,7 +24,7 @@ rule all:
 
 ################     generate reference data bases    ##########################
 
-include: "generate58SDatabase.snakefile.py"
+include: "prepDatabases.snakefile.py"
 
 ################ quality control ###############################################
 
