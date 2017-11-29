@@ -155,8 +155,8 @@ rule db_creat58SIndex:
         "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
 
 rule db_creatUniteIndex:
-    input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
-    output: touch("%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config)
+    input: "%(dbFolder)s/unite_%(unite_version)s.fasta" % config
+    output: touch("%(dbFolder)s/unite_%(unite_version)s.fasta.lambdaIndexCreated" % config)
     threads: 6
     shell:
         "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config

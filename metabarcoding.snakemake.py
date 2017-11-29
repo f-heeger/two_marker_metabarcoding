@@ -395,7 +395,7 @@ rule r58S_align:
         "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
 
 rule r58S_classify:
-    input: lam="lambda/all.58S.derep_vs_58SRef.m8", otus="r58S_derep/all.5_8S_derep.fasta"
+    input: lam="lambda/all.58S.derep_vs_58SRef.m8", otus="r58S_derep/all.5_8S_derep.fasta", tax="%(dbFolder)s/58S_tax.tsv" % config
     output: "taxonomy/all.58S.derep.class.tsv"
     params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=.90
     log: "logs/58s_class.log"
@@ -408,10 +408,14 @@ rule r58S_classify:
         evalueFilter = 0
         identFilter = 0
         covFilter = 0
+        tax = {}
+        for line in open(input.tax):
+            tId, tLin = line.strip().split("\t")
+            tax["%s" % tId] = tLin
         for rec in SeqIO.parse(open(input.otus), "fasta"):
             seqNr += 1
             classifi[rec.id] = []
-            itsLength[rec.id.split("|",1)[0]] = len(rec)
+            seqLength[rec.id] = len(rec)
         for line in open(input.lam, encoding="latin-1"):
             total +=1
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
@@ -422,12 +426,10 @@ rule r58S_classify:
             if float(pident) < params.minIdent:
                 identFilter +=1
                 continue
-            if float(length)/itsLength[readId]*100 < params.minCov:
+            if float(length)/seqLength[readId]*100 < params.minCov:
                 covFilter += 1
                 continue
-            linStr = sseqid.rsplit("|", 1)[-1]
-            if linStr.endswith("Incertae"):
-                linStr += "_sedis" #FIXME: workaroud for taking the tayonomy from the fasta header which ends at a space. Wither fix fasta headers or take taxonomy from UNITE taxonomy file
+            linStr = tax[sseqid]
             classifi[qseqid].append((linStr, float(bitscore)))
         logOut.write("%i alignmetns for %i sequences\n" % (total, seqNr))
         logOut.write("%i excluded, because e-value was higher than %e\n" % (evalueFilter, params.maxE))
@@ -592,7 +594,7 @@ rule its_clustering:
 
 
 rule its_alignToUnite:
-    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config
+    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/unite_%(unite_version)s.fasta" % config, dbFlag="%(dbFolder)s/unite_%(unite_version)s.fasta.lambdaIndexCreated" % config
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3
@@ -600,12 +602,16 @@ rule its_alignToUnite:
         "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
 
 rule its_classify:
-    input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta"
+    input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta",  tax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config
     output: "taxonomy/all.ITS2.otus.class.tsv"
     params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=.90
     log: "logs/its_class.log"
     run:
         logOut = open(log[0], "w")
+        tax = {}
+        for line in open(input.tax):
+            tId, tLin = line.strip().split("\t")
+            tax["%s" % tId] = tLin
         classifi = {}
         itsLength = {}
         seqNr = 0
@@ -616,7 +622,7 @@ rule its_classify:
         for rec in SeqIO.parse(open(input.otus), "fasta"):
             seqNr += 1
             classifi[rec.id] = []
-            itsLength[rec.id.split("|",1)[0]] = len(rec)
+            itsLength[rec.id] = len(rec)
         for line in open(input.lam, encoding="latin-1"):
             total +=1
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
@@ -630,9 +636,7 @@ rule its_classify:
             if float(length)/itsLength[readId]*100 < params.minCov:
                 covFilter += 1
                 continue
-            linStr = sseqid.rsplit("|", 1)[-1]
-            if linStr.endswith("Incertae"):
-                linStr += "_sedis" #FIXME: workaroud for taking the tayonomy from the fasta header which ends at a space. Wither fix fasta headers or take taxonomy from UNITE taxonomy file
+            linStr = tax[sseqid]
             classifi[qseqid].append((linStr, float(bitscore)))
         logOut.write("%i alignmetns for %i sequences\n" % (total, seqNr))
         logOut.write("%i excluded, because e-value was higher than %e\n" % (evalueFilter, params.maxE))
