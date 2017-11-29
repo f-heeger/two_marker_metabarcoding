@@ -24,21 +24,13 @@ rule all:
 
 ################ generate reference sequence for 5.8S ##########################
 
-#include: "generate58SDatabase.snakefile.py"
+include: "generate58SDatabase.snakefile.py"
 
 ################ generate lamda db from UNTIE ##################################
 
-rule db_getUniteFile:
-    output: "%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config
-    shell:
-        "cd %(dbFolder)s;" \
-        "wget https://unite.ut.ee/sh_files/sh_general_release_%(uniteVersion)s.zip;" \
-        "unzip sh_general_release_%(uniteVersion)s.zip;" \
-        "rm sh_general_release_%(uniteVersion)s.zip" % config
-
 rule db_creatUniteIndex:
-    input: "%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config
-    output: touch("%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta.lambdaIndexCreated" % config)
+    input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
+    output: touch("%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config)
     threads: 6
     shell:
         "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
@@ -375,7 +367,7 @@ rule r58S_removePrimerAndNs:
 rule r58S_dereplicate:
     """dereplicate 5.8S sequences and only retain "clusters" with more than one sequence"""
     input: "primerremoved/all.5_8S_primerRemoved.fasta"
-    output: fasta="r58S_derep/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
+    output: fasta="mothur/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
     log: "logs/all_rep58S.log"
     params: minsize=2
     run:
@@ -403,8 +395,8 @@ rule r58S_dereplicate:
                 if clusterSize[cluster] >= params.minsize:
                     out.write("%s\t%s\n" % (seq, cluster))
 
-rule r58S_alignToUnite:
-    input: otus="r58S_derep/all.5_8S_derep.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta.lambdaIndexCreated" % config
+rule r58S_align:
+    input: otus="r58S_derep/all.5_8S_derep.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config
     output: "lambda/all.58S.derep_vs_UNITE.m8"
     log: "logs/all_58s_lambda.log"
     threads: 3
@@ -609,7 +601,7 @@ rule its_clustering:
 
 
 rule its_alignToUnite:
-    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(uniteVersion)s.fasta.lambdaIndexCreated" % config
+    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3
