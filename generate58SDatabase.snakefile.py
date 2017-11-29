@@ -147,6 +147,20 @@ rule createTax:
                 lcaLin = lca(linStrs, 0.95)
                 out.write("%s\t%s\n" % (rep, lcaLin))
 
+rule db_creat58SIndex:
+    input: "%(dbFolder)s/58S_derep.fasta" % config
+    output: touch("%(dbFolder)s/58S_derep.fasta.lambdaIndexCreated" % config)
+    threads: 6
+    shell:
+        "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
+
+rule db_creatUniteIndex:
+    input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
+    output: touch("%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config)
+    threads: 6
+    shell:
+        "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
+
 def lca(lineageStrings, stringency=1.0, 
         unidentified=["unidentified", "unclassified", "unknown"],
         ignoreIncertaeSedis=True, sizes=None):

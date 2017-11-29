@@ -22,18 +22,9 @@ rule all:
     input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv", "otu_table.tsv", "All.rarefactions.pdf"
 #    input: "taxonomy/All.krona.html", "taxonomy/5_8s.krona.html", expand(["taxonomy/{sample}_ITS2.otus_5.8sClass.tsv", "taxonomy/{sample}.ITS2.otus.class.tsv"], sample=samples)
 
-################ generate reference sequence for 5.8S ##########################
+################     generate reference data bases    ##########################
 
 include: "generate58SDatabase.snakefile.py"
-
-################ generate lamda db from UNTIE ##################################
-
-rule db_creatUniteIndex:
-    input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
-    output: touch("%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config)
-    threads: 6
-    shell:
-        "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
 
 ################ quality control ###############################################
 
@@ -396,15 +387,15 @@ rule r58S_dereplicate:
                     out.write("%s\t%s\n" % (seq, cluster))
 
 rule r58S_align:
-    input: otus="r58S_derep/all.5_8S_derep.fasta", db="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config, dbFlag="%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta.lambdaIndexCreated" % config
-    output: "lambda/all.58S.derep_vs_UNITE.m8"
+    input: otus="r58S_derep/all.5_8S_derep.fasta", db="%(dbFolder)s/58S_derep.fasta" % config, dbFlag="%(dbFolder)s/58S_derep.fasta.lambdaIndexCreated" % config
+    output: "lambda/all.58S.derep_vs_58SRef.m8"
     log: "logs/all_58s_lambda.log"
     threads: 3
     shell:
         "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
 
 rule r58S_classify:
-    input: lam="lambda/all.58S.derep_vs_UNITE.m8", otus="r58S_derep/all.5_8S_derep.fasta"
+    input: lam="lambda/all.58S.derep_vs_58SRef.m8", otus="r58S_derep/all.5_8S_derep.fasta"
     output: "taxonomy/all.58S.derep.class.tsv"
     params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=.90
     log: "logs/58s_class.log"
