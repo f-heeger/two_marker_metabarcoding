@@ -51,9 +51,10 @@ rule init_concat:
 rule qc_fastqc:
     input: "%(inFolder)s/{sample}_L001_R{read_number}_001.fastq.gz" % config
     output: "QC/{sample}_L001_R{read_number}_001_fastqc.zip"
+    log: "logs/fastqc_{sample}.txt"
     threads: 6
     shell:
-        "%(fastqc)s --nogroup -o QC --threads {threads} {input}" % config
+        "%(fastqc)s --nogroup -o QC --threads {threads} {input} &> {log}" % config
 
 def qc_multiqc_input(wildcards):
     return ["QC/%s_L001_R%s_001_fastqc.zip" % (s,r) for s,r in itertools.product(samples, ["1","2"])]
@@ -61,8 +62,9 @@ def qc_multiqc_input(wildcards):
 rule qc_multiqc:
     input: qc_multiqc_input
     output: "QC/multiqc_report.html", "QC/multiqc_data/multiqc_fastqc.txt"
+    log: "logs/multiqc.txt"
     shell:
-        "%(multiqc)s -f --interactive -o QC QC/*_fastqc.zip" % config
+        "%(multiqc)s -f --interactive -o QC QC/*_fastqc.zip &> {log}" % config
 
 rule qc_readCounts:
     input: "QC/multiqc_data/multiqc_fastqc.txt"
