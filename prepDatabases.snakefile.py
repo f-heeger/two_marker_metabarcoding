@@ -22,6 +22,8 @@ rule db_makeRfamFiles:
     log: "%(dbFolder)s/logs/rfam_tax_log.txt" % config
     run:
         ranks = ["superkingdom","kingdom", "phylum", "class", "order", "family", "genus", "species"]
+        if not config["email"] or not "@" in config["email"]:
+            raise ValueError("'%s' is not a valid email. Set email in config file for NCBI querries.")
         nuc2tax = NuclId2TaxIdMap(config["email"], cachePath="%(dbFolder)s/nuc2tax.csv" % config, retry=3)
         tax2lin = LineageMap(config["email"], cachePath="%(dbFolder)s/tax2lin.csv" % config, retry=3)
         noId = 0
@@ -174,13 +176,13 @@ class NcbiMap(dict):
     this lookup will be stored in the local dictonary. The detaileds of the 
     request have to be implemeneted by inheriting calsses.
     The local dictonary can be saved to the hard drive as csv file and loaded
-    when an object is copnstructed.
+    when an object is constructed.
     """
     def __init__(self, email, indict={}, cachePath=None, retry=0, useCache=True):
         """Constuctor for mapping object.
         
         A dictonary of already known assignments can be passed via the indict
-        parameter. The cachePath can is the path were the save and load fucntion
+        parameter. The cachePath is the path were the save and load function
         will search for a csv file. retry gives the number of times a request 
         should be send to NCBI after again before giving up (0 means only send 
         once).
@@ -294,7 +296,7 @@ class LineageMap(NcbiMap):
             self[tax].append((rank, lTax, lName))
 
 class NuclId2TaxIdMap(NcbiMap):
-    """Map NCBI nucleotide GIs to the taxonomy ID of the species they come from.
+    """Map NCBI nucleotide ID to the taxonomy ID of the species they come from.
     
     """
     
@@ -330,6 +332,6 @@ class NuclId2TaxIdMap(NcbiMap):
                            "Reading NCBI response caused an exception."
                            "NCBI response was:\n%s" % (key, str(resp)))
         raise KeyError("'%s' is not in the dictonary. "
-                       "NCBI response did not contain taxonomy inforamtion. "
+                       "NCBI response did not contain taxonomy information. "
                        "NCBI response was:\n%s" % (key, str(resp)[:100]))
 
