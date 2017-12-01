@@ -319,10 +319,12 @@ rule r58S_extract_58S:
         for seqId, entry in ITSxParser(open(input.pos)):
             pos[seqId] = entry
         with open(output.fasta, "w") as out, open(output.gtf, "w") as gtf:
+            total = 0
             nothingFound = 0
             no58s = 0
             tooShort = 0
             for rec in SeqIO.parse(open(input.seq), "fasta"):
+                total += 1
                 try:
                     anno = pos[rec.id]
                 except KeyError:
@@ -342,8 +344,12 @@ rule r58S_extract_58S:
                                 rec.id = "%s|5.8S;%s;" % (oldId, size)
                                 rec.description="Extracted 5.8S sequence 0-%i" % (start-1)
                                 out.write(rec[0:start].format("fasta"))
+        propMiss = (nothingFound+no58s+tooShort)/total
+        if  propMiss > 0.10:
+            print("WARNING: in %f%% of all sequences no 5.8S was found. See %s for details." % (propMiss*100, log[0]))
         with open(log[0], "a") as logStream:
             logStream.write("-------- 5.8S Extraction --------\n")
+            logStream.write("5.8S was found in %f%% of the %i sequences.\n" % ((1-propMiss)*100, total))
             logStream.write("ITSx found nothing in %i sequences\n" % nothingFound)
             logStream.write("ITSx found no 5.8S (ITS2 starts at 0) in %i sequences\n" % no58s)
             logStream.write("ITSx found ITS too close to the start in %i sequences\n" % tooShort)
