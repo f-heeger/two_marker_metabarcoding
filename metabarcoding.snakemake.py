@@ -410,7 +410,7 @@ rule r58S_classify:
     run:
         logOut = open(log[0], "w")
         classifi = {}
-        itsLength = {}
+        seqLength = {}
         seqNr = 0
         total = 0
         evalueFilter = 0
