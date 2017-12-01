@@ -366,7 +366,7 @@ rule r58S_removePrimerAndNs:
 rule r58S_dereplicate:
     """dereplicate 5.8S sequences and only retain "clusters" with more than one sequence"""
     input: "primerremoved/all.5_8S_primerRemoved.fasta"
-    output: fasta="mothur/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
+    output: fasta="r58S_derep/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
     log: "logs/all_rep58S.log"
     params: minsize=2
     run:
