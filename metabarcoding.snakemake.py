@@ -422,8 +422,8 @@ rule r58S_classify:
             tax["%s" % tId] = tLin
         for rec in SeqIO.parse(open(input.otus), "fasta"):
             seqNr += 1
-            classifi[rec.id] = []
-            seqLength[rec.id] = len(rec)
+            classifi[rec.id.split("|", 1)[0]] = []
+            seqLength[rec.id.split("|", 1)[0]] = len(rec)
         for line in open(input.lam, encoding="latin-1"):
             total +=1
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
@@ -437,8 +437,8 @@ rule r58S_classify:
             if float(length)/seqLength[readId]*100 < params.minCov:
                 covFilter += 1
                 continue
-            linStr = tax[sseqid]
-            classifi[qseqid].append((linStr, float(bitscore)))
+            linStr = tax[sseqid.split(";", 1)[0]]
+            classifi[qseqid.split("|", 1)[0]].append((linStr, float(bitscore)))
         logOut.write("%i alignmetns for %i sequences\n" % (total, seqNr))
         logOut.write("%i excluded, because e-value was higher than %e\n" % (evalueFilter, params.maxE))
         logOut.write("%i excluded, because identity was lower than %d%%\n" % (identFilter, params.minIdent))
@@ -481,9 +481,9 @@ rule r58S_readClassification:
             
         readClass = {}
         for line in open(input.tax):
-            rName, classification = line.strip().split("\t")
-            rId, sizeStr = rName.strip(";").split(";")
-            count = int(sizeStr.split("=")[1])
+            rId, classification = line.strip().split("\t")
+#            rId, sizeStr = rName.strip(";").split(";")
+#            count = int(sizeStr.split("=")[1])
             cls = []
             for entry in classification.strip(";").split(";"):
                 if entry == "unclassified":
@@ -492,12 +492,12 @@ rule r58S_readClassification:
                     cls = [""]
                 else:
                     cls.append(entry)
-            i=0
-            for r58seq in rep58s[rId]:
+#            i=0
+            for r58seq in rep58s["%s|5.8S" % rId]:
                 for read in repseq[r58seq.split("|")[0]]:
                     readClass[read] = ";".join(cls)
-                    i+=1
-            assert i==count
+#                    i+=1
+#            assert i==count
         with open(output[0], "w") as out:
             for read, cls in readClass.items():
                 out.write("%s\t%s\n" % (read, cls))
@@ -630,7 +630,7 @@ rule its_classify:
         for rec in SeqIO.parse(open(input.otus), "fasta"):
             seqNr += 1
             classifi[rec.id] = []
-            itsLength[rec.id] = len(rec)
+            itsLength[rec.id.split("|", 1)[0]] = len(rec)
         for line in open(input.lam, encoding="latin-1"):
             total +=1
             qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
