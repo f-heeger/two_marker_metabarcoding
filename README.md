@@ -14,7 +14,6 @@
 * [VSEARCH](https://github.com/torognes/vsearch)
 * [ITSx](http://microbiology.se/software/itsx/)
 * [cutadapt](https://github.com/marcelm/cutadapt)
-* [mothur](http://mothur.org/)
 * [Flexbar](https://github.com/seqan/flexbar)
 * [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
 * [Pear](http://sco.h-its.org/exelixis/web/software/pear/)

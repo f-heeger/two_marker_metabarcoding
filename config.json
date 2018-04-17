@@ -7,7 +7,6 @@
     "vsearch": "/home/heeger/bin/vsearch-1.9.7-linux-x86_64/bin/vsearch",
     "itsx" : "/home/heeger/bin/ITSx_1.0.11/ITSx",
     "cutadapt": "cutadapt",
-    "mothur" : "/home/heeger/bin/Mothur.cen_64/mothur/mothur",
     "flexbar" : "/home/heeger/bin/flexbar_v2.5_beta/flexbar",
     "trimmomatic": "/home/heeger/bin/Trimmomatic-0.35/trimmomatic-0.35.jar",
     "pear": "/home/heeger/bin/PEAR/bin/pear-0.9.6-bin-64",
