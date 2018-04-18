@@ -856,7 +856,7 @@ rule final_combineClassification:
                 nameStr, linStr = line.strip("\n").split("\t")
                 name = nameStr.split("|")[0]
                 lin = linStr.split(";")
-                tsuLin = tsu[name].split(";")[:2] # trim down to phylum
+                tsuLin = tsu[name].split(";")[:3] # trim down to class
                 if len(lin) <= 1:
                     #if the ITS classification is only one level deep 
                     # (this could also be "unknown") compare it to the first level
