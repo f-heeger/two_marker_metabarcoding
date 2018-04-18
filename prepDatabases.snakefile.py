@@ -23,7 +23,7 @@ rule db_makeRfamFiles:
     run:
         ranks = ["superkingdom","kingdom", "phylum", "class", "order", "family", "genus", "species"]
         if not config["email"] or not "@" in config["email"]:
-            raise ValueError("'%s' is not a valid email. Set email in config file for NCBI querries.")
+            raise ValueError("'%s' is not a valid email. Set email in config file for NCBI querries." % config["email"])
         nuc2tax = NuclId2TaxIdMap(config["email"], cachePath="%(dbFolder)s/nuc2tax.csv" % config, retry=3)
         tax2lin = LineageMap(config["email"], cachePath="%(dbFolder)s/tax2lin.csv" % config, retry=3)
         noId = 0
@@ -58,9 +58,9 @@ rule db_getUniteFile:
     output: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
     shell:
         "cd %(dbFolder)s;"\
-        "wget https://unite.ut.ee/sh_files/sh_general_release_%(unite_version)s.zip;"\
-        "unzip sh_general_release_%(unite_version)s.zip;"\
-        "rm sh_general_release_%(unite_version)s.zip" % config
+        "wget %(uniteUrl)s;"\
+        "unzip *.zip;"\
+        "rm *.zip" % config
 
 rule db_makeUniteFiles:
     input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
@@ -79,9 +79,10 @@ rule db_makeUniteFiles:
 rule db_extract58S:
     input: "%(dbFolder)s/unite_%(unite_version)s.fasta" % config
     output: "%(dbFolder)s/ITSx/unite_%(unite_version)s.5_8S.fasta" % config
+    log: "%(dbFolder)s/logs/db_itsx.log"
     threads: 6
     shell:
-        "%(itsx)s -t . -i {input} -o %(dbFolder)s/ITSx/unite_%(unite_version)s --save_regions 5.8S --cpu {threads} --graphical F" % config
+        "%(itsx)s -t . -i {input} -o %(dbFolder)s/ITSx/unite_%(unite_version)s --save_regions 5.8S --cpu {threads} --graphical F &> {log}" % config
 
 rule cat58S:
     input: "%(dbFolder)s/ITSx/unite_%(unite_version)s.5_8S.fasta" % config, "%(dbFolder)s/RF00002_%(rfam_version)s_dna.fasta" % config
@@ -114,7 +115,7 @@ rule derep:
     output: fasta="%(dbFolder)s/58S_derep.fasta" % config, uc="%(dbFolder)s/58S_derep.uc.txt" % config
     log: "%(dbFolder)s/logs/derep58S.log" % config
     run:
-        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.uc} --sizeout --log {log}" % config)
+        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.uc} --sizeout --log {log} &> /dev/null" % config)
 
 rule createTax:
     input: uc="%(dbFolder)s/58S_derep.uc.txt" % config, uTax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config, rTax="%(dbFolder)s/RF00002_%(rfam_version)s_tax.tsv" % config
@@ -131,21 +132,27 @@ rule createTax:
                 assert int(sLen) == len(clu[query])
             else:
                 raise ValueError("Unknown record type: %s" % lType)
-        tax = {}
+        uTax = {}
         for line in open(input.uTax):
             tId, tLin = line.strip().split("\t")
-            tax["%s" % tId] = tLin
+            uTax[tId] = tLin
+        rTax = {}
         for line in open(input.rTax):
             tId, tLin = line.strip().split("\t")
-            tax[tId] = tLin
+            rTax[tId] = tLin
         with open(output[0], "w") as out:
             for rep, memList in clu.items():
                 linStrs = []
                 for m in memList:
                     if m[:2] == "SH":
-                        linStrs.append(tax[m.split("|")[0]])
+                        linStrs.append(uTax[m.split("|")[0]])
                     else:
-                        linStrs.append(tax[m])
+                        lin = rTax[m]
+                        if lin.split(";")[1] == "Fungi":
+                            #ignore everything RFAM has to say about fungi taxonomy
+                            linStrs.append("Eukaryota;Fungi")
+                        else:
+                            linStrs.append(lin)
                 lcaLin = lca(linStrs, 0.95)
                 out.write("%s\t%s\n" % (rep, lcaLin))
 
