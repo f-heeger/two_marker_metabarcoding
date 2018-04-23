@@ -13,8 +13,9 @@ rule db_all:
 
 rule db_getRfamFile:
     output: "%(dbFolder)s/RF00002_%(rfam_version)s.fasta.gz" % config
+    log: "%(dbFolder)s/logs/rfam_dl.log" % config
     shell:
-        "wget -O %(dbFolder)s/RF00002_%(rfam_version)s.fasta.gz \"ftp://ftp.ebi.ac.uk/pub/databases/Rfam/%(rfam_version)s/fasta_files/RF00002.fa.gz\"" % config
+        "wget -o {log} -O %(dbFolder)s/RF00002_%(rfam_version)s.fasta.gz \"ftp://ftp.ebi.ac.uk/pub/databases/Rfam/%(rfam_version)s/fasta_files/RF00002.fa.gz\"" % config
         
 rule db_makeRfamFiles:
     input: fasta="%(dbFolder)s/RF00002_%(rfam_version)s.fasta.gz" % config
@@ -46,7 +47,7 @@ rule db_makeRfamFiles:
                     logFile.write("no ncbi lineage\t%s\n" % Id)
                     noLin += 1
                     continue
-                linStr = ";".join([l[2] for l in lin if l[0] in ranks])
+                linStr = ";".join(["%s__%s" %(l[0][0], l[2]) for l in lin if l[0] in ranks])
                 taxOut.write("%s\t%s\n" % (rec.id, linStr))
                 out.write(rec.format("fasta"))
         sys.stderr.write("No taxon ID: %i, no lineage: %i\n" % (noId, noLin))
@@ -56,11 +57,12 @@ rule db_makeRfamFiles:
 
 rule db_getUniteFile:
     output: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
+    log: "%(dbFolder)s/logs/unite_dl.log" % config
     shell:
         "cd %(dbFolder)s;"\
-        "wget %(uniteUrl)s;"\
-        "unzip *.zip;"\
-        "rm *.zip" % config
+        "wget -o {log} -O sh_general_release_dynamic_%(unite_version)s.zip %(uniteUrl)s;"\
+        "unzip sh_general_release_dynamic_%(unite_version)s.zip;"\
+        "rm sh_general_release_dynamic_%(unite_version)s.zip" % config
 
 rule db_makeUniteFiles:
     input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
@@ -79,7 +81,7 @@ rule db_makeUniteFiles:
 rule db_extract58S:
     input: "%(dbFolder)s/unite_%(unite_version)s.fasta" % config
     output: "%(dbFolder)s/ITSx/unite_%(unite_version)s.5_8S.fasta" % config
-    log: "%(dbFolder)s/logs/db_itsx.log"
+    log: "%(dbFolder)s/logs/db_itsx.log" % config
     threads: 6
     shell:
         "%(itsx)s -t . -i {input} -o %(dbFolder)s/ITSx/unite_%(unite_version)s --save_regions 5.8S --cpu {threads} --graphical F &> {log}" % config
@@ -148,11 +150,12 @@ rule createTax:
                         linStrs.append(uTax[m.split("|")[0]])
                     else:
                         lin = rTax[m]
-                        if lin.split(";")[1] == "Fungi":
+                        arr = lin.split(";")
+                        if arr[1] == "k__Fungi":
                             #ignore everything RFAM has to say about fungi taxonomy
-                            linStrs.append("Eukaryota;Fungi")
+                            linStrs.append("k__Fungi")
                         else:
-                            linStrs.append(lin)
+                            linStrs.append(";".join(arr[1:]))
                 lcaLin = lca(linStrs, 0.95)
                 out.write("%s\t%s\n" % (rep, lcaLin))
 
