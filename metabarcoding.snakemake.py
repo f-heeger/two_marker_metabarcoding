@@ -856,7 +856,7 @@ rule final_combineClassification:
                 nameStr, linStr = line.strip("\n").split("\t")
                 name = nameStr.split("|")[0]
                 lin = linStr.split(";")
-                tsuLin = tsu[name].split(";")[:3] # trim down to class
+                tsuLin = tsu[name].split(";")[:2] # trim down to phylum
                 if len(lin) <= 1:
                     #if the ITS classification is only one level deep 
                     # (this could also be "unknown") compare it to the first level
@@ -900,10 +900,10 @@ rule final_combineClassification:
                             conflict[(lin[0], tsuLin[0])] = 1
                 else:
                     #if the ITS classification is more than one level deep
-                    # check if the first two levels of classifications are identical
+                    # check if the first three levels of classifications are identical
                     if lin[:2] == tsuLin[:2]:
                         #if they are the same accept the ITS classification
-                        # (including all levels after the second)
+                        # (including all levels after the third)
                         out.write("%s\t%s;\n" % (name, linStr))
                     else:
                         #otherwise write the classifcation
@@ -1014,6 +1014,75 @@ rule final_classCompare:
                     depthComb = 0
                 stat.write("comb\t%s\t%s\t%s\n" % (readId, otuId, str(depthComb)))
 
+rule final_diffClsDepth:
+    input: "taxonomy/all.clsStat.tsv"
+    output: "taxonomy/all.otuClsDepth.tsv"
+    run:
+        depth = {}
+        size = {}
+        for line in open(input[0]):
+            marker, read, otu, tDepth = line.strip().split("\t")
+            try:
+                depth[otu][marker] = tDepth
+            except KeyError:
+                depth[otu] = {"ITS2": None, "58S": None}
+                depth[otu][marker] = tDepth
+                size[otu] = 0
+            if marker == "ITS2":
+                size[otu] += 1
+        
+        with open(output[0], "w") as out:
+            for oId, mDepth in depth.items():
+                out.write("%s\t%i\t%s\t%s\n" % (oId, size[oId], mDepth["58S"], mDepth["ITS2"]))
+
+rule final_phylumDiff:
+    input: "otu_table.tsv"
+    output: "fungiPhylumDiff.tsv"
+    run:
+        with open(input[0]) as inStream, open(output[0], "w") as out:
+            next(inStream) #header
+            out.write("otu\tsize\tphylum58s\tphylumIts2\n")
+            for line in inStream:
+                oId, cls58s, clsits2, clscomb, counts = line.strip("\n").split("\t", 4)
+                size = sum([int(c) for c in counts.split("\t")])
+                if size < 2:
+                    #skip singletons
+                    continue
+                if cls58s.split(";")[0] != "k__Fungi" and clsits2.split(";")[0] != "k__Fungi":
+                    continue
+                    #skip non-fungi
+                try:
+                    p58s = cls58s.split(";")[1]
+                except IndexError:
+                    p58s = None
+                try:
+                    pits2 = clsits2.split(";")[1]
+                except IndexError:
+                    pits2 = None
+                out.write("%s\t%i\t%s\t%s\n" % (oId, size, p58s, pits2))
+
+rule final_plotPhylumDiff:
+    input: "fungiPhylumDiff.tsv"
+    output: "gainFrom58s.pdf"
+    run:
+        R("""
+        library(reshape2)
+        library(ggplot2)
+        
+        d = read.table("{input}", header=T)
+        
+        newL = unique(c(levels(d$phylum58s), levels(d$phylumIts2)))
+        d$phylum58s = factor(d$phylum58s, levels=newL)
+        d$phylumIts2 = factor(d$phylumIts2, levels=newL)
+        
+        m = melt(d[d$size>1 & d$phylumIts2 == "None",], id.vars=c("otu", "size"))
+        
+        cPalette = c("grey", rev(c("#cab2d6", "#fdbf6f", "#fb9a99", "#b2df8a", "#a6cee3", "#6a3d9a", "#ff7f00", "#e31a1c", "#33a02c", "#1f78b4", "#b15928")))
+        
+        ggplot(m[m$variable=="phylum58s",]) + geom_bar(aes(1,fill=value)) + scale_fill_manual(values=cPalette) + theme_bw()
+        ggsave("{output}", width=5, height=8)
+        
+        """)
 
 rule its_perSampleOtuReads:
     input: otuReads="swarm/all.otuReads.tsv", sample="readInfo/sample_R1.tsv"
