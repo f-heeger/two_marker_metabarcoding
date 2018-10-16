@@ -34,6 +34,7 @@ Make sure that you installed all the prerequisites listed above.
 ## preparing your working directory
 
 1. Your working folder should contain two files beside this readme:
+    * `perpDatabases.snakemake.py`
     * `metabarcoding.snakemake.py`
     * `config.json`
 2. create a folder inside the working directory to hold database files
