@@ -1,13 +1,16 @@
-# Prerequisites
+# Two marker metabarcoding pipeline
+Snakemake pipeline for analysis of metabarcoding data of fungi with more than one marker (5.8S and ITS2).
 
-## Python and Python libraries
+## Prerequisites
+
+### Python and Python libraries
 
 * Python 3.x
 * BioPython
 * rpy2
 * snakemake (version 3.5.4 or newer)
 
-## External Software
+### External Software
 
 * [FastQC](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 * [MultiQC](http://multiqc.info/) (optional)
@@ -21,42 +24,45 @@
 * [swarm](https://github.com/torognes/swarm)
 * [Lambda](http://seqan.github.io/lambda/) version 0.9 or 1.0 (the 1.9.* version is not supported yet)
 
-## Reference Databases
+### Reference Data
+Reference data will be downloaded and processed automatically
 
-* UNITE ITS database (will be downloaded automatically)
-* 5.8S reference alignment (alignment in fasta format and taxonomy information in tsv format)
+* [UNITE](https://unite.ut.ee/) ITS database
+* [RFAM](http://rfam.xfam.org/) family RF00002 (5.8S rRNA) 
 
-# Installation
+## Installation
 Make sure that you installed all the prerequisites listed above.
 
-## getting the pipeline files
+### Preparing your working directory
 
-## preparing your working directory
+You can directly download the files into your working directory or clone the repository with git. Your working folder should contain three files beside this readme:
 
-1. Your working folder should contain two files beside this readme:
-    * `perpDatabases.snakemake.py`
-    * `metabarcoding.snakemake.py`
-    * `config.json`
-2. create a folder inside the working directory to hold database files
-3. put the 5.8S reference files into the database folder that you created
+   * `perpDatabases.snakemake.py`
+   * `metabarcoding.snakemake.py`
+   * `config.json`
 
-## setting up your configuration file
+### Setting up your configuration file
 
-The configuration file gives the paths to all necessary resources (software and data) as well as some information about your run.
 The config file is in json format and is a list of keys (or names) and values separated by a ":".
+
+The configuration file gives the paths to all necessary resources (software and data) as well as some information about your run and additional configuration. You need to change the information about your run, the software paths and your e-mail address (for querrying the NCBI database).
+
+#### Software paths:
+
 For each software that is used during pipeline execution there is an entry that should contain the absolute path to the softwares binary or the command the software can be executed with. There are two exceptions to this. For Lambda the entry should be the path to the folder containing the lambda binary as well as the lambda-indexer binary. For Trimmomatic the path should be given for the Trimmomatic `.jar` file.
 
-In addition to the software paths there are the following entries that give information about your run:
+#### Information about your run:
 
-1. **inFolder**: the absolut path to the folder that contains the fastq files of the raw reads (after demultiplexing)
-2. **dbFolder**: the name of the folder you created to hold your databases (step 3. in the last section)
-3. **samples**: a list of key-value pairs describing your data. The list is enclosed by "{" and each entry is separated by a ",". They key gives the sample ID as it was used used in the sequencing run (what the files are called), while the value gives the names you want the samples identified by in the final result. Example: `{"A1_S1": "lake1_sample1", "A3_S2": "lake1_sample2", "B12_S3": "lake2_sample1"}`
-4. **forward_primer**: the sequence of your forward amplification primer
-5. **reverse_primer**: the sequence of your reverse amplification primer
+* **inFolder**: the absolute path to the folder that contains the fastq files of the raw reads (after demultiplexing)
+* **dbFolder**: where should the databases be stored
+* **samples**: a list of key-value pairs describing your data. The list is enclosed by "{" and each entry is separated by a ",". They key gives the sample ID as it was used used in the sequencing run (what the files are called), while the value gives the names you want the samples identified by in the final result. Example: `{"A1_S1": "lake1_sample1", "A3_S2": "lake1_sample2", "B12_S3": "lake2_sample1"}`
+* **forward_primer**: the sequence of your forward amplification primer
+* **reverse_primer**: the sequence of your reverse amplification primer
 
-# Configuration
+#### Your e-mail adresse:
+to build the database the pipeline will query the NCBI taxonomy database. NCBI requires automated API calls like this to also send an e-mail address. Your e-mail address will not be used for anything else.
 
-The config file also contains optional configurations, which can be used to change the behavior of the pipeline.
+#### Configuration of pipeline behavior
 
 * **conflictBehavior** This parameter defines what the pipeline will do if the 5.8S and ITS2 classifications differ from each other. There are three possible values:
     1. `mark`: The conflict is marked in the classification with an entry of the form: <ITS classification>|<5.8S classification>
@@ -66,12 +72,17 @@ The config file also contains optional configurations, which can be used to chan
 * **maxAmplLen** Maximum length of amplicons without the amplification primers. Will be passed to pears `-m` option.
 * **minAmplLen** Minimum length of amplicons without the amplification primers. Will be passed to pears `-n` option.
 
-# Running the pipeline
+#### Reference Data
+* **unite_version**: Release date of the UNITE database you want to use (default: 01.12.2017 i.e. version 7.2)
+* **uniteUrl**: URL were the UNITE database should be downloaded from
+* **rfam_version**: Version of the RFAM database you want to use (default: 13.0)
+
+## Running the pipeline
 
 * Open a terminal and navigate to your working directory.
 * type the following command: `snakemake -s metabarcoding.snakemake.py -j 6` where "6" is the number of processors to use
 
-# Hidden Features
+## Hidden Features
 Some output files are not generated by default. Here is how to get them:
 
 * Concatenated 5.8S and ITS2 sequence for each OTU representative: run `snakemake -s metabarcoding.snakemake.py all.concatMarkers.fasta` to generate `all.concatMarkers.fasta` in the main folder. Some OTUs might be skipped if no 5.8S could be extracted for the representative.
