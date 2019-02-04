@@ -92,26 +92,6 @@ rule cat58S:
     shell:
         "cat {input} > {output}"
 
-#rule derepById:
-#    input: fasta="%(dbFolder)s/58S.fasta" % config, sh2gId="%(dbFolder)s/unite_%(unite_version)s_gIds.tsv" % config
-#    output: "%(dbFolder)s/58S_derepById.fasta" % config
-#    log: "%(dbFolder)s/logs/derepById58S.log" % config
-#    run:
-#        sh2gId = {}
-#        gId2sh = {}
-#        for line in open(input.sh2gId):
-#            sh, gId = line.strip("\n").split("\t")
-#            sh2gId[sh] = gId
-#            gId2sh[gId] = sh
-#        with open(output[0], "w") as out:
-#            for rec in SeqIO.parse(open(input.fasta), "fasta"):
-#                if rec.id[:2] != "SH":
-#                    if rec.id.split(".", 1)[0] not in gId2sh:
-#                        #this genbank sequence is not represented by a UNITE sequence
-#                        out.write(rec.format("fasta"))
-#                else:
-#                    out.write(rec.format("fasta"))
-
 rule derep:
     input: "%(dbFolder)s/58S.fasta" % config
     output: fasta="%(dbFolder)s/58S_derep.fasta" % config, uc="%(dbFolder)s/58S_derep.uc.txt" % config
