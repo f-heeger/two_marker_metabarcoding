@@ -16,19 +16,19 @@ rule all:
     input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv", "otu_table.tsv", "All.rarefactions.pdf"
 
 ### generate reference data bases
-include: "rules/prepDatabases.snakefile.py"
+include: "prepDatabases.snakemake.py"
 
 ### read processing
-include: "rules/readProcessing.snakemake.py"
+include: "readProcessing.snakemake.py"
 
 ### analize 5.8S
-include: "rules/r58S.snakemake.py"
+include: "r58S.snakemake.py"
 
 ### analize ITS2
-include: "rules/its.snakemake.py"
+include: "its.snakemake.py"
 
 ### combine 5.8S and ITS2 and analize result
-include "rules/rules/final.snakemake.py"
+include: "final.snakemake.py"
 
 
 
