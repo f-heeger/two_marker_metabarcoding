@@ -96,8 +96,10 @@ rule derep:
     input: "%(dbFolder)s/58S.fasta" % config
     output: fasta="%(dbFolder)s/58S_derep.fasta" % config, uc="%(dbFolder)s/58S_derep.uc.txt" % config
     log: "%(dbFolder)s/logs/derep58S.log" % config
+    conda:
+        "envs/vsearch.yaml"
     run:
-        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.uc} --sizeout --log {log} &> /dev/null" % config)
+        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.uc} --sizeout --log {log} &> /dev/null")
 
 rule createTax:
     input: uc="%(dbFolder)s/58S_derep.uc.txt" % config, uTax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config, rTax="%(dbFolder)s/RF00002_%(rfam_version)s_tax.tsv" % config
@@ -143,13 +145,17 @@ rule db_creat58SIndex:
     input: "%(dbFolder)s/58S_derep.fasta" % config
     output: touch("%(dbFolder)s/58S_derep.fasta.lambdaIndexCreated" % config)
     threads: 6
+    conda:
+        "envs/lambda.yaml"
     shell:
-        "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
+        "lambda_indexer -d {input} -p blastn -t {threads}"
 
 rule db_creatUniteIndex:
     input: "%(dbFolder)s/unite_%(unite_version)s.fasta" % config
     output: touch("%(dbFolder)s/unite_%(unite_version)s.fasta.lambdaIndexCreated" % config)
     threads: 6
+    conda:
+        "envs/lambda.yaml"
     shell:
-        "%(lambdaFolder)s/lambda_indexer -d {input} -p blastn -t {threads}" % config
+        "lambda_indexer -d {input} -p blastn -t {threads}"
 

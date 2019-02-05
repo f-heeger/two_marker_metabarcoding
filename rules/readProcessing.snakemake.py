@@ -27,8 +27,10 @@ rule qc_fastqc:
     output: "QC/{sample}_L001_R{read_number}_001_fastqc.zip"
     log: "logs/fastqc_{sample}.txt"
     threads: 6
+    conda:
+        "envs/fastqc.yaml"
     shell:
-        "%(fastqc)s --nogroup -o QC --threads {threads} {input} &> {log}" % config
+        "fastqc --nogroup -o QC --threads {threads} {input} &> {log}" % config
 
 def qc_multiqc_input(wildcards):
     return ["QC/%s_L001_R%s_001_fastqc.zip" % (s,r) for s,r in itertools.product(samples, ["1","2"])]
@@ -37,8 +39,10 @@ rule qc_multiqc:
     input: qc_multiqc_input
     output: "QC/multiqc_report.html", "QC/multiqc_data/multiqc_fastqc.txt"
     log: "logs/multiqc.txt"
+    conda:
+        "envs/multiqc.yaml"
     shell:
-        "%(multiqc)s -f --interactive -o QC QC/*_fastqc.zip &> {log}" % config
+        "multiqc -f --interactive -o QC QC/*_fastqc.zip &> {log}" % config
 
 rule qc_readCounts:
     input: "QC/multiqc_data/multiqc_fastqc.txt"
@@ -112,8 +116,10 @@ rule init_filterPrimer:
     output: "primers/all_barcode_ITS-ITS_1.fastq.gz", "primers/all_barcode_ITS-ITS_2.fastq.gz"
     log: "logs/all_flexbar.log"
     threads: 6
+    conda:
+        "envs/flexbar.yaml"
     shell:
-        "echo \">ITS\n%(forward_primer)s\" > primers/fwd_primer.fasta; echo \">ITS\n%(reverse_primer)s\" > primers/rev_primer.fasta; %(flexbar)s -n {threads} -r {input.read1} -p {input.read2} -t primers/all -b primers/fwd_primer.fasta -b2 primers/rev_primer.fasta -bk -be LEFT_TAIL -bn 25 -bt %(primerErr)f -f i1.8 -u 100 -z GZ &> {log}" % config
+        "echo \">ITS\n%(forward_primer)s\" > primers/fwd_primer.fasta; echo \">ITS\n%(reverse_primer)s\" > primers/rev_primer.fasta; flexbar -n {threads} -r {input.read1} -p {input.read2} -t primers/all -b primers/fwd_primer.fasta -b2 primers/rev_primer.fasta -bk -be LEFT_TAIL -bn 25 -bt %(primerErr)f -f i1.8 -u 100 -z GZ &> {log}" % config
 
 rule init_primerReadNumbers:
     input: reads="primers/all_barcode_ITS-ITS_1.fastq.gz", sample="readInfo/sample_R1.tsv"
@@ -140,8 +146,10 @@ rule init_trimming:
     log: "logs/all_timming.log"
     threads: 3
     params: windowLen=8, minQual=20, minLen=200, avgQual=30
+    conda:
+        "envs/trommomatic.yaml"
     shell:
-        "java -jar %(trimmomatic)s PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual} &> {log}" % config
+        "trimmomatic PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual} &> {log}" % config
 
 rule init_trimmStats:
     input: "logs/{sample}_trimmomatic.log"
@@ -182,8 +190,10 @@ rule init_merge:
     params: minOverlap=10
     threads: 3
     log: "logs/all_pear.log"
+    conda:
+        "envs/pear.yaml"
     shell:
-        "%(pear)s -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n %(minAmplLen)s -m %(maxAmplLen)s -v {params.minOverlap} &> {log}" % config
+        "pear -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n %(minAmplLen)s -m %(maxAmplLen)s -v {params.minOverlap} &> {log}" % config
 
 rule init_convertMerged:
     input: "merged/all.assembled.fastq"
@@ -215,6 +225,8 @@ rule init_mergedReadNumbers:
 rule init_readNumberOverview:
     input: raw="readNumbers/rawReadNumbers.tsv", indexQual="readNumbers/indexQualityReadNumbers.tsv", primer="readNumbers/primerReadNumbers.tsv", trimmed="readNumbers/trimmedReadNumbers.tsv", merged="readNumbers/mergedReadNumbers.tsv"
     output: "readNumbers/readNumbers.pdf"
+    conda:
+        "envs/ggplot.yaml"
     run:
         R("""
         library(ggplot2)
@@ -248,8 +260,10 @@ rule init_dereplicate:
     input: "merged/all.fasta"
     output: fasta="init_derep/all.derep.fasta", tsv="readInfo/all.repseq.tsv", txt="init_derep/all.uc.txt"
     log: "logs/all_repSeq.log"
+    conda:
+        "envs/vsearch.yaml"
     run:
-        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizeout --log {log}" % config)
+        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizeout --log {log}" % config)
         with open(output.tsv, "w") as out:
             for line in open(output.txt):
                 arr = line.strip().split("\t")
@@ -269,8 +283,10 @@ rule init_removeChimera:
     input: "init_derep/all.derep.fasta"
     output: fasta="chimera/all.nochimera.fasta", tsv="chimera/all.chimeraReport.tsv"
     log: "logs/all_chimera.log"
+    conda:
+        "envs/vsearch.yaml"
     shell:
-        "%(vsearch)s --uchime_denovo {input} --nonchimeras {output.fasta} --uchimeout {output.tsv} --log {log}" % config
+        "vsearch --uchime_denovo {input} --nonchimeras {output.fasta} --uchimeout {output.tsv} --log {log}" % config
     
 
 rule init_itsx:
@@ -278,7 +294,9 @@ rule init_itsx:
     output: "itsx/all.5_8S.fasta", "itsx/all.ITS2.fasta", "itsx/all.LSU.fasta", "itsx/all.summary.txt", "itsx/all.positions.txt"
     threads: 6
     log: "logs/all_itsx.log"
+    conda:
+        "envs/itsx.yaml"
     shell:
-        "%(itsx)s -t . -i {input} -o itsx/all --save_regions 5.8S,ITS2,LSU --complement F --cpu {threads} --graphical F --detailed_results T --partial 50 2> {log}" % config
+        "ITSx -t . -i {input} -o itsx/all --save_regions 5.8S,ITS2,LSU --complement F --cpu {threads} --graphical F --detailed_results T --partial 50 2> {log}" % config
 
 

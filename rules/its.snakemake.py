@@ -24,8 +24,10 @@ rule its_dereplicate:
     output: fasta="its_derep/all.ITS2_extracted.derep.fasta", tsv="readInfo/all.repITS2.tsv", txt="its_derep/all.uc.txt"
     log: "logs/all_repIts.log"
     params: minsize=2
+    conda:
+        "envs/vsearch.yaml"
     run:
-        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}" % config)
+        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}"
         
         seq2cluster = {}
         clusterSize = {}
@@ -54,8 +56,10 @@ rule its_clustering:
     output: seeds="swarm/all.ITS2.otus.fasta", otuList="swarm/all.ITS2.otus.out"
     log: "logs/all_swarm.log"
     threads: 3
+    conda:
+        "envs/swarm2.yaml"
     shell:
-        "%(swarm)s -f -z -t {threads} -w {output.seeds} {input} -o {output.otuList} &> {log}" % config
+        "swarm -f -z -t {threads} -w {output.seeds} {input} -o {output.otuList} &> {log}"
 
 
 rule its_alignToUnite:
@@ -63,8 +67,10 @@ rule its_alignToUnite:
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3
+    conda:
+        "envs/lambda.yaml"
     shell:
-        "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
+        "lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}"
 
 rule its_classify:
     input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta",  tax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config
@@ -263,8 +269,10 @@ rule its_kronaPrep:
 rule its_krona:
     input: expand("krona/{sample}_ITS2.krona.tsv", sample=samples)
     output: "krona/ITS2.krona.html"
+    conda:
+        "envs/krona.yaml"
     shell:
-        "%(ktImportText)s -o {output} {input}" % config
+        "ktImportText -o {output} {input}"
 
 
 rule its_perSampleOtuReads:

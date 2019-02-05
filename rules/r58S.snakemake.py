@@ -50,8 +50,10 @@ rule r58S_removePrimerAndNs:
     output: "primerremoved/all.5_8S_primerRemoved.fasta"
     log: "logs/all_58S_cutadapt.log"
     params: minOverlap=10, maxN=1
+    conda:
+        "emvs/cutadapt.yaml"
     shell:
-        "%(cutadapt)s -g ^%(forward_primer)s --trimmed-only -O {params.minOverlap} --max-n={params.maxN} -o {output} {input} &> {log}" % config
+        "cutadapt -g ^%(forward_primer)s --trimmed-only -O {params.minOverlap} --max-n={params.maxN} -o {output} {input} &> {log}" % config
 
 rule r58S_dereplicate:
     """dereplicate 5.8S sequences and only retain "clusters" with more than one sequence"""
@@ -59,8 +61,10 @@ rule r58S_dereplicate:
     output: fasta="r58S_derep/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
     log: "logs/all_rep58S.log"
     params: minsize=2
+    conda:
+        "envs/vsearch.yaml"
     run:
-        shell("%(vsearch)s --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}" % config)
+        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}"
         
         seq2cluster = {}
         clusterSize = {}
@@ -89,8 +93,10 @@ rule r58S_align:
     output: "lambda/all.58S.derep_vs_58SRef.m8"
     log: "logs/all_58s_lambda.log"
     threads: 3
+    conda:
+        "envs/lambda.yaml"
     shell:
-        "%(lambdaFolder)s/lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}" % config
+        "lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}"
 
 rule r58S_classify:
     input: lam="lambda/all.58S.derep_vs_58SRef.m8", otus="r58S_derep/all.5_8S_derep.fasta", tax="%(dbFolder)s/58S_tax.tsv" % config
@@ -222,6 +228,8 @@ rule r58S_prepKronaInput:
 rule r58S_krona:
     input: expand("krona/{sample}_5_8S.tsv", sample=samples)
     output: "krona/5_8s.krona.html"
+    conda:
+        "envs/krona.yaml"
     shell:
-        "%(ktImportText)s -o {output} {input}" % config
+        "ktImportText -o {output} {input}"
 

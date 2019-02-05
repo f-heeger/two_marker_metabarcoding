@@ -255,6 +255,8 @@ rule final_phylumDiff:
 rule final_plotPhylumDiff:
     input: "fungiPhylumDiff.tsv"
     output: "gainFrom58s.pdf"
+    conda:
+        "envs/ggplot.yaml"
     run:
         R("""
         library(reshape2)
@@ -308,6 +310,8 @@ rule final_combineRarefactions:
 rule final_plotRarefactions:
     input: "rarefaction/All.rarefactions.tsv"
     output: "All.rarefactions.pdf"
+    conda:
+        "envs/ggplot.yaml"
     run:
         R("""library(ggplot2)
         
@@ -448,5 +452,7 @@ rule final_kronaPrepStep2:
 rule final_kronaAll:
     input: "krona/All.krona.xml"
     output: "krona/All.krona.html"
+    conda:
+        "envs/krona.yaml"
     shell:
-        "%(ktImportXML)s -o {output} {input}" % config
+        "ktImportXML -o {output} {input}"
