@@ -83,8 +83,10 @@ rule db_extract58S:
     output: "%(dbFolder)s/ITSx/unite_%(unite_version)s.5_8S.fasta" % config
     log: "%(dbFolder)s/logs/db_itsx.log" % config
     threads: 6
+    conda:
+        "envs/itsx.yaml"
     shell:
-        "%(itsx)s -t . -i {input} -o %(dbFolder)s/ITSx/unite_%(unite_version)s --save_regions 5.8S --cpu {threads} --graphical F &> {log}" % config
+        "ITSx -t . -i {input} -o %(dbFolder)s/ITSx/unite_%(unite_version)s --save_regions 5.8S --cpu {threads} --graphical F &> {log}"
 
 rule cat58S:
     input: "%(dbFolder)s/ITSx/unite_%(unite_version)s.5_8S.fasta" % config, "%(dbFolder)s/RF00002_%(rfam_version)s_dna.fasta" % config
@@ -98,8 +100,8 @@ rule derep:
     log: "%(dbFolder)s/logs/derep58S.log" % config
     conda:
         "envs/vsearch.yaml"
-    run:
-        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.uc} --sizeout --log {log} &> /dev/null")
+    shell:
+        "vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.uc} --sizeout --log {log} &> /dev/null"
 
 rule createTax:
     input: uc="%(dbFolder)s/58S_derep.uc.txt" % config, uTax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config, rTax="%(dbFolder)s/RF00002_%(rfam_version)s_tax.tsv" % config

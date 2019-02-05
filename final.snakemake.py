@@ -257,24 +257,8 @@ rule final_plotPhylumDiff:
     output: "gainFrom58s.pdf"
     conda:
         "envs/ggplot.yaml"
-    run:
-        R("""
-        library(reshape2)
-        library(ggplot2)
-        
-        d = read.table("{input}", header=T)
-        
-        newL = unique(c(levels(d$phylum58s), levels(d$phylumIts2)))
-        d$phylum58s = factor(d$phylum58s, levels=newL)
-        d$phylumIts2 = factor(d$phylumIts2, levels=newL)
-        
-        m = melt(d[d$size>1 & d$phylumIts2 == "None",], id.vars=c("otu", "size"))
-        
-        cPalette = c("grey", rev(c("#cab2d6", "#fdbf6f", "#fb9a99", "#b2df8a", "#a6cee3", "#6a3d9a", "#ff7f00", "#e31a1c", "#33a02c", "#1f78b4", "#b15928")))
-        
-        ggplot(m[m$variable=="phylum58s",]) + geom_bar(aes(1,fill=value)) + scale_fill_manual(values=cPalette) + theme_bw()
-        ggsave("{output}", width=5, height=8)
-        """)
+    script:
+        "scripts/plotPhylumDiff.R"
 
 rule final_computeRarefaction:
     input: "swarm/{sample}.ITS2.otus.out"
@@ -312,45 +296,8 @@ rule final_plotRarefactions:
     output: "All.rarefactions.pdf"
     conda:
         "envs/ggplot.yaml"
-    run:
-        R("""library(ggplot2)
-        
-            raw=read.table("{input}")
-            colnames(raw) = c("sample", "x", "y")
-
-            allPlotData = data.frame()
-            anno=data.frame()
-
-            for (tSample in unique(raw$sample)){{
-
-                print(tSample)
-                d = subset(raw, sample==tSample)
-                plotData = data.frame(unique(d$x))
-                colnames(plotData) = c("x")
-                N=length(plotData$x)
-
-                plotData$mean=NA
-                plotData$cmin=NA
-                plotData$cmax=NA
-                plotData$sample=tSample
-
-                conf = 0.95
-
-                for (i in 1:length(plotData$x)) {{
-                    x_i = plotData$x[i]
-                    s = subset(d, x==x_i)
-                    plotData$mean[i] = mean(s$y)
-                    plotData$cmin[i] = sort(s$y)[floor(length(s$y)*(1-conf)/2)]
-                    plotData$cmax[i] = sort(s$y)[ceiling(length(s$y)*(1-(1-conf)/2))]
-                }}
-                anno=rbind(anno, plotData[plotData$x==max(plotData$x),])
-
-            allPlotData = rbind(allPlotData, plotData)
-
-            }}
-
-            ggplot(allPlotData, aes(x, mean)) + geom_point(aes(color=sample), size=0.1) + geom_ribbon(aes(ymin=cmin, ymax=cmax, fill=sample), alpha=0.2) + annotate("text", x=anno$x, y=anno$mean, label=anno$sample)
-            ggsave("{output}", width=16, height=9)""")
+    script:
+        "scripts/plotRarefaction.R"
 
 rule final_creatOtuTable:
     input: tax58s="taxonomy/all_ITS2.otus_5.8sClass.tsv", taxIts="taxonomy/all.ITS2.otus.class.tsv", taxComb="taxonomy/all.ITS2.otus.combClass.tsv", otus=expand("swarm/{sample}.ITS2.otus.out", sample=samples)

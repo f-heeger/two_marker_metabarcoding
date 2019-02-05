@@ -51,24 +51,28 @@ rule r58S_removePrimerAndNs:
     log: "logs/all_58S_cutadapt.log"
     params: minOverlap=10, maxN=1
     conda:
-        "emvs/cutadapt.yaml"
+        "envs/cutadapt.yaml"
     shell:
         "cutadapt -g ^%(forward_primer)s --trimmed-only -O {params.minOverlap} --max-n={params.maxN} -o {output} {input} &> {log}" % config
 
-rule r58S_dereplicate:
+rule r58S_dereplicate1:
     """dereplicate 5.8S sequences and only retain "clusters" with more than one sequence"""
     input: "primerremoved/all.5_8S_primerRemoved.fasta"
-    output: fasta="r58S_derep/all.5_8S_derep.fasta", tsv="readInfo/all.rep58S.tsv", txt="r58S_derep/all.uc.txt"
+    output: fasta="r58S_derep/all.5_8S_derep.fasta", txt="r58S_derep/all.uc.txt"
     log: "logs/all_rep58S.log"
     params: minsize=2
     conda:
         "envs/vsearch.yaml"
+    shell:
+        "vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}"
+
+rule r58S_dereplicate2:
+    input: txt="r58S_derep/all.uc.txt"
+    output: tsv="readInfo/all.rep58S.tsv"
     run:
-        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}"
-        
         seq2cluster = {}
         clusterSize = {}
-        for line in open(output.txt):
+        for line in open(input.txt):
             arr = line.strip().split("\t")
             if arr[0] == "C":
                 cluster = arr[-2].split(";")[0]

@@ -147,7 +147,7 @@ rule init_trimming:
     threads: 3
     params: windowLen=8, minQual=20, minLen=200, avgQual=30
     conda:
-        "envs/trommomatic.yaml"
+        "envs/trimmomatic.yaml"
     shell:
         "trimmomatic PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual} &> {log}" % config
 
@@ -227,45 +227,24 @@ rule init_readNumberOverview:
     output: "readNumbers/readNumbers.pdf"
     conda:
         "envs/ggplot.yaml"
-    run:
-        R("""
-        library(ggplot2)
-        raw = read.table("{input.raw}", header=F)
-        raw = raw[order(raw$V1),]
-        raw$stage = "raw"
-        d = raw
-        iQual = read.table("{input.indexQual}", header=F)
-        iQual = iQual[order(iQual$V1),]
-        iQual$stage = "indexQualityFiltered"
-        d = rbind(d, iQual)
-        primer = read.table("{input.primer}", header=F)
-        primer = primer[order(primer$V1),]
-        primer$stage = "primerFound"
-        d = rbind(d, primer)
-        trimmed = read.table("{input.trimmed}", header=F)
-        trimmed = trimmed[order(trimmed$V1),]
-        trimmed$stage = "trimmed"
-        d=rbind(d, trimmed)
-        merged = read.table("{input.merged}", header=F)
-        merged = merged[order(merged$V1),]
-        merged$stage = "merged"
-        d=rbind(d,merged)
-        colnames(d) = c("sample", "readNum", "stage")
-        d$stage = factor(d$stage, levels=c("merged", "trimmed", "primerFound", "indexQualityFiltered", "raw"))
-        ggplot(d) + geom_bar(aes(sample, readNum, fill=stage), stat="identity", position="dodge") + coord_flip() + geom_hline(yintercept = 10000, linetype="dashed")
-        ggsave("{output}", width=7, height=28, units="in")
-        """)
+    script:
+        "scripts/plotReadnumbers.R"
 
-rule init_dereplicate:
+rule init_dereplicate1:
     input: "merged/all.fasta"
-    output: fasta="init_derep/all.derep.fasta", tsv="readInfo/all.repseq.tsv", txt="init_derep/all.uc.txt"
+    output: fasta="init_derep/all.derep.fasta", txt="init_derep/all.uc.txt"
     log: "logs/all_repSeq.log"
     conda:
         "envs/vsearch.yaml"
+    shell:
+        "vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizeout --log {log}"
+
+rule init_dereplicate2:
+    input: txt="init_derep/all.uc.txt"
+    output: tsv="readInfo/all.repseq.tsv"
     run:
-        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizeout --log {log}" % config)
         with open(output.tsv, "w") as out:
-            for line in open(output.txt):
+            for line in open(input.txt):
                 arr = line.strip().split("\t")
                 if arr[0] == "C":
                     pass

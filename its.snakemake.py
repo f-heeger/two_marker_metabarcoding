@@ -19,19 +19,24 @@ rule its_goodReads:
                 if rec.seq.count("N") == 0:
                     out.write(rec.format("fasta"))
 
-rule its_dereplicate:
+rule its_dereplicate1:
     input: "itsx/all.ITS2_extracted.good.fasta"
-    output: fasta="its_derep/all.ITS2_extracted.derep.fasta", tsv="readInfo/all.repITS2.tsv", txt="its_derep/all.uc.txt"
+    output: fasta="its_derep/all.ITS2_extracted.derep.fasta", txt="its_derep/all.uc.txt"
     log: "logs/all_repIts.log"
     params: minsize=2
     conda:
         "envs/vsearch.yaml"
+    shell:
+        "vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}"
+
+rule its_dereplicate2:
+    input: txt="its_derep/all.uc.txt"
+    output: tsv="readInfo/all.repITS2.tsv"
+    params: minsize=2
     run:
-        shell("vsearch --derep_fulllength {input} --output {output.fasta} --uc {output.txt} --sizein --sizeout --minuniquesize {params.minsize} --log {log}"
-        
         seq2cluster = {}
         clusterSize = {}
-        for line in open(output.txt):
+        for line in open(input.txt):
             arr = line.strip().split("\t")
             if arr[0] == "C":
                 cluster = arr[-2].split(";")[0]
