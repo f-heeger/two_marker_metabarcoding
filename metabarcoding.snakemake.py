@@ -1070,7 +1070,7 @@ rule final_plotPhylumDiff:
         
         m = melt(d[d$size>1 & d$phylumIts2 == "None",], id.vars=c("otu", "size"))
         
-        cPalette = c("grey", rev(c("#cab2d6", "#fdbf6f", "#fb9a99", "#b2df8a", "#a6cee3", "#6a3d9a", "#ff7f00", "#e31a1c", "#33a02c", "#1f78b4", "#b15928")))
+        cPalette = c("grey", rev(c("#cab2d6", "#fdbf6f", "#fb9a99", "#b2df8a", "#a6cee3", "#a56d4d", "#6a3d9a", "#ff7f00", "#e31a1c", "#33a02c", "#1f78b4", "#b15928")))
         
         ggplot(m[m$variable=="phylum58s",]) + geom_bar(aes(1,fill=value)) + scale_fill_manual(values=cPalette) + theme_bw()
         ggsave("{output}", width=5, height=8)
@@ -1206,6 +1206,37 @@ rule final_creatOtuTable:
                 otu, cls = line.strip("\n").split("\t")
                 numbers = [readNr[sample].get(otu, "0") for sample in samples]
                 out.write("%s\t%s\t%s\t%s\t%s\n" % (otu, r58sCls[otu], itsCls[otu], cls, "\t".join(numbers)))
+
+rule final_otuKronaPrep:
+    input: "otu_table.tsv"
+    output: r58s="krona/58S_otu.krona.tsv", its="krona/ITS2_otu.krona.tsv", comb="krona/comb_otu.krona.tsv"
+    run:
+        tsuCount = {"": 0}
+        itsCount = {"": 0}
+        combCount = {"": 0}
+        with open(input[0]) as inStream:
+            header = next(inStream)
+            for line in inStream:
+                oId, tsu, its, comb, _ = line.split("\t", 4)
+                for marker, counter in zip([tsu, its, comb],[tsuCount, itsCount, combCount]):
+                    if marker.strip(";") == "unknown":
+                        counter[""] +=1
+                    else:
+                        try:
+                            counter[marker] +=1
+                        except KeyError:
+                            counter[marker] = 1
+        for outFile, counter in zip([output.r58s, output.its, output.comb], [tsuCount, itsCount, combCount]):
+            with open(outFile, "w") as out:
+                for cls, count in counter.items():
+                    clsStr = "\t".join([c[3:] for c in cls.strip(";").split(";")])
+                    out.write("%i\t%s\n" % (count, clsStr))
+
+rule final_otuKrona:
+    input: "krona/58S_otu.krona.tsv", "krona/ITS2_otu.krona.tsv", "krona/comb_otu.krona.tsv"
+    output: "krona/all_otu.krona.html"
+    shell:
+        "%(ktImportText)s -o {output} {input}" % config
 
 rule final_kronaPrepStep1:
     input: tax="taxonomy/all.ITS2.otus.combClass.tsv", otuReads = "swarm/{sample}.ITS2.otus.out"
