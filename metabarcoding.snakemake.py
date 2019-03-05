@@ -14,13 +14,11 @@ configfile: "config.json"
 
 shell.prefix("sleep 10; ") #work aorund to desl with "too quck" rule execution and slow NAS
 
-#samples =  {"A1_S1": "A1_S1", "B1_S2": "B1_S2", "H5_S40": "H5_S40", "A5_S33": "A5_S33"}
 
 samples = config["samples"].keys()
 
 rule all:
     input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv", "otu_table.tsv", "All.rarefactions.pdf"
-#    input: "taxonomy/All.krona.html", "taxonomy/5_8s.krona.html", expand(["taxonomy/{sample}_ITS2.otus_5.8sClass.tsv", "taxonomy/{sample}.ITS2.otus.class.tsv"], sample=samples)
 
 ################     generate reference data bases    ##########################
 
@@ -169,19 +167,19 @@ rule init_trimming:
     shell:
         "java -jar %(trimmomatic)s PE -threads {threads} -phred33 {input.r1} {input.r2} {output.r1} {output.r1}.unpaired {output.r2} {output.r2}.unpaired SLIDINGWINDOW:{params.windowLen}:{params.minQual} TRAILING:{params.minQual} MINLEN:{params.minLen} AVGQUAL:{params.avgQual} &> {log}" % config
 
-#rule init_trimmStats:
-#    input: "logs/{sample}_trimmomatic.log"
-#    output: "logs/{sample}_trimmStats.pdf"
-#    run:
-#        R("""
-#        library(ggplot2)
-#        d = read.table("{input}", header=F)
-#        colnames(d) = c("seqName", "read", "len", "firstBase", "lastBase", "trimmed")
-#        d$readNr = matrix(unlist(strsplit(as.character(d$read), ":")), ncol=4, byrow=T)[,1]
-#        
-#        ggplot(d) + geom_histogram(aes(len, fill=readNr), position="dodge", binwidth=5)
-#        ggsave("{output}")
-#        """)
+rule init_trimmStats:
+    input: "logs/{sample}_trimmomatic.log"
+    output: "logs/{sample}_trimmStats.pdf"
+    run:
+        R("""
+        library(ggplot2)
+        d = read.table("{input}", header=F)
+        colnames(d) = c("seqName", "read", "len", "firstBase", "lastBase", "trimmed")
+        d$readNr = matrix(unlist(strsplit(as.character(d$read), ":")), ncol=4, byrow=T)[,1]
+        
+        ggplot(d) + geom_histogram(aes(len, fill=readNr), position="dodge", binwidth=5)
+        ggsave("{output}")
+        """)
 
 rule init_trimmedReadNumbers:
     input: reads="trimmed/all_trimmed_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
@@ -482,8 +480,6 @@ rule r58S_readClassification:
         readClass = {}
         for line in open(input.tax):
             rId, classification = line.strip().split("\t")
-#            rId, sizeStr = rName.strip(";").split(";")
-#            count = int(sizeStr.split("=")[1])
             cls = []
             for entry in classification.strip(";").split(";"):
                 if entry == "unclassified":
@@ -492,12 +488,9 @@ rule r58S_readClassification:
                     cls = [""]
                 else:
                     cls.append(entry)
-#            i=0
             for r58seq in rep58s["%s|5.8S" % rId]:
                 for read in repseq[r58seq.split("|")[0]]:
                     readClass[read] = ";".join(cls)
-#                    i+=1
-#            assert i==count
         with open(output[0], "w") as out:
             for read, cls in readClass.items():
                 out.write("%s\t%s\n" % (read, cls))
