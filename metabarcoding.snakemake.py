@@ -22,7 +22,7 @@ rule all:
 
 ################     generate reference data bases    ##########################
 
-include: "prepDatabases.snakefile.py"
+include: "prepDatabases.snakemake.py"
 
 ################ quality control ###############################################
 
