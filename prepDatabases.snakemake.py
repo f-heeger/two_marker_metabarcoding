@@ -44,7 +44,7 @@ rule db_makeRfamFiles:
                 try:
                     lin = tax2lin[tId]
                 except:
-                    logFile.write("no ncbi lineage\t%s\n" % Id)
+                    logFile.write("no ncbi lineage\t%s\n" % tId)
                     noLin += 1
                     continue
                 linStr = ";".join(["%s__%s" %(l[0][0], l[2]) for l in lin if l[0] in ranks])
@@ -56,16 +56,20 @@ rule db_makeRfamFiles:
 
 
 rule db_getUniteFile:
-    output: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
-    log: "%(dbFolder)s/logs/unite_dl.log" % config
+    output: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.zip" % config
+    log: "logs/unite_dl.log" % config
     shell:
-        "cd %(dbFolder)s;"\
-        "wget -o {log} -O sh_general_release_dynamic_%(unite_version)s.zip %(uniteUrl)s;"\
-        "unzip sh_general_release_dynamic_%(unite_version)s.zip;"\
-        "rm sh_general_release_dynamic_%(unite_version)s.zip" % config
+        "wget -o {log} -O {output} %(uniteUrl)s;" % config
+
+rule db_unpackUniteFile:
+    input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.zip" % config
+    output: "%(dbFolder)s/sh_general_release_dynamic_all_%(unite_version)s.fasta" % config
+    log: "logs/unite_unpack.log" % config
+    shell:
+        "unzip -d %(dbFolder)s %(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.zip &> {log}" % config
 
 rule db_makeUniteFiles:
-    input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
+    input: "%(dbFolder)s/sh_general_release_dynamic_all_%(unite_version)s.fasta" % config
     output: fasta="%(dbFolder)s/unite_%(unite_version)s.fasta" % config, tax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config, sh2gId="%(dbFolder)s/unite_%(unite_version)s_gIds.tsv" % config
     run:
         with open(output.fasta, "w") as fasta, open(output.tax, "w") as tax, open(output.sh2gId, "w") as sh2gId:
