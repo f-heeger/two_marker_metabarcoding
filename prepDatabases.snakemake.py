@@ -57,7 +57,7 @@ rule db_makeRfamFiles:
 
 rule db_getUniteFile:
     output: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
-    log: "%(dbFolder)s/logs/unite_dl.log" % config
+    log: "logs/unite_dl.log"
     shell:
         "cd %(dbFolder)s;"\
         "wget -o {log} -O sh_general_release_dynamic_%(unite_version)s.zip %(uniteUrl)s;"\
