@@ -112,17 +112,17 @@ rule init_indexQualityReadNumbers:
 
 
 rule init_filterPrimer:
-    input: read1="raw/all_R1.fastq.gz", read2="raw/all_R2.fastq.gz"
-    output: "primers/all_barcode_ITS-ITS_1.fastq.gz", "primers/all_barcode_ITS-ITS_2.fastq.gz"
-    log: "logs/all_flexbar.log"
+    input: r1="raw/all_R1.fastq.gz", r2="raw/all_R2.fastq.gz"
+    output: r1="primers/all_primers_R1.fastq.gz", r2="primers/all_primers_R2.fastq.gz"
+    log: "logs/all_cutadapt.log"
     threads: 6
     conda:
-        "envs/flexbar.yaml"
+        "envs/cutadapt.yaml"
     shell:
-        "echo \">ITS\n%(forward_primer)s\" > primers/fwd_primer.fasta; echo \">ITS\n%(reverse_primer)s\" > primers/rev_primer.fasta; flexbar -n {threads} -r {input.read1} -p {input.read2} -t primers/all -b primers/fwd_primer.fasta -b2 primers/rev_primer.fasta -bk -be LEFT_TAIL -bn 25 -bt %(primerErr)f -f i1.8 -u 100 -z GZ &> {log}" % config
+        "cutadapt -g X%(forward_primer)s -A %(reverse_primer)sX --action none --discard-untrimmed --cores {threads} --error-rate %(primerErr)f -o {output.r1} -p {output.r2} {input.r1} {input.r2} > {log}" % config
 
 rule init_primerReadNumbers:
-    input: reads="primers/all_barcode_ITS-ITS_1.fastq.gz", sample="readInfo/sample_R1.tsv"
+    input: reads="primers/all_primers_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
     output: "readNumbers/primerReadNumbers.tsv"
     run:
         readSample = {}
@@ -141,7 +141,7 @@ rule init_primerReadNumbers:
                 out.write("%s\t%s\n" % (sample, value))
 
 rule init_trimming:
-    input: r1="primers/all_barcode_ITS-ITS_1.fastq.gz", r2="primers/all_barcode_ITS-ITS_2.fastq.gz"
+    input: r1="primers/all_primers_R1.fastq.gz", r2="primers/all_primers_R2.fastq.gz"
     output: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
     log: "logs/all_timming.log"
     threads: 3

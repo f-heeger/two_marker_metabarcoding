@@ -1,4 +1,4 @@
 channels:
  - bioconda
 dependencies:
- - cutadapt=1.9.1
+ - cutadapt=2.3
