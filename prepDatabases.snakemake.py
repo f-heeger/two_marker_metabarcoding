@@ -1,9 +1,6 @@
-import gzip
-import time
-import csv
-from Bio import Entrez
-from Bio.Entrez.Parser import ValidationError
-from Bio import SeqIO
+#import gzip
+#import time
+#import csv
 
 configfile: "config.json"
 
