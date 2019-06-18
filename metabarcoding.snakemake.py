@@ -1,13 +1,9 @@
-#import xml.etree.ElementTree as et
 
-from snakemake.utils import min_version, R
-from Bio import SeqIO
+from snakemake.utils import min_version
 
 min_version("3.5.4")
 
 configfile: "config.json"
-
-shell.prefix("sleep 10; ") #work aorund to desl with "too quck" rule execution and slow NAS
 
 
 samples = config["samples"].keys()

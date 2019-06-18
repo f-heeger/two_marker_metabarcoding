@@ -1,4 +1,4 @@
 channels:
  - bioconda
 dependencies:
- - flexbar=3.3.0
+ - flexbar=2.5.0
