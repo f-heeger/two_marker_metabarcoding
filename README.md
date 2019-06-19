@@ -3,26 +3,26 @@ Snakemake pipeline for analysis of metabarcoding data of fungi with more than on
 
 ## Prerequisites
 
-### Python and Python libraries
+### Software you need to install
+You need to install a version of Conda, that will be used to install all other software automatically except Snakemake and Python. You can use Conda to install Snakemake (which will automatically install Python).
 
+* [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
 * Python 3.x
-* BioPython
-* rpy2
-* snakemake (version 3.5.4 or newer)
+* [Snakemake (version 3.5.4 or newer)](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html)
 
-### External Software
+### Software that will be installed automatically
+The following tools will be automatically installed by Snakemake trough conda. Make sure that Conda is in your path, when you run Snakemake.
 
 * [FastQC](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
 * [MultiQC](http://multiqc.info/) (optional)
 * [VSEARCH](https://github.com/torognes/vsearch)
 * [ITSx](http://microbiology.se/software/itsx/)
 * [cutadapt](https://github.com/marcelm/cutadapt)
-* [Flexbar](https://github.com/seqan/flexbar)
 * [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
 * [Pear](http://sco.h-its.org/exelixis/web/software/pear/)
 * [Krona](https://github.com/marbl/Krona/wiki/KronaTools)
 * [swarm](https://github.com/torognes/swarm)
-* [Lambda](http://seqan.github.io/lambda/) version 0.9 or 1.0 (the 1.9.* version is not supported yet)
+* [Lambda](http://seqan.github.io/lambda/)
 
 ### Reference Data
 Reference data will be downloaded and processed automatically
@@ -31,25 +31,25 @@ Reference data will be downloaded and processed automatically
 * [RFAM](http://rfam.xfam.org/) family RF00002 (5.8S rRNA) 
 
 ## Installation
-Make sure that you installed all the prerequisites listed above.
 
 ### Preparing your working directory
 
-You can directly download the files into your working directory or clone the repository with git. Your working folder should contain three files beside this readme:
+You can directly download the files into your working directory or clone the repository with git. Your working folder should contain the files beside this readme:
 
    * `perpDatabases.snakemake.py`
    * `metabarcoding.snakemake.py`
+   * `final.snakemake.py`
+   * `its.snakemake.py`
+   * `r58S.snakemake.py`
+   * `readProcessing.snakemake.py`
    * `config.json`
 
 ### Setting up your configuration file
 
 The config file is in json format and is a list of keys (or names) and values separated by a ":".
 
-The configuration file gives the paths to all necessary resources (software and data) as well as some information about your run and additional configuration. You need to change the information about your run, the software paths and your e-mail address (for querrying the NCBI database).
+The configuration file gives the paths to all necessary data as well as some information about your run and additional configuration. You need to change the information about your run, the software paths and your e-mail address (for querrying the NCBI database).
 
-#### Software paths:
-
-For each software that is used during pipeline execution there is an entry that should contain the absolute path to the softwares binary or the command the software can be executed with. There are two exceptions to this. For Lambda the entry should be the path to the folder containing the lambda binary as well as the lambda-indexer binary. For Trimmomatic the path should be given for the Trimmomatic `.jar` file.
 
 #### Information about your run:
 
@@ -68,7 +68,7 @@ to build the database the pipeline will query the NCBI taxonomy database. NCBI r
     1. `mark`: The conflict is marked in the classification with an entry of the form: <ITS classification>|<5.8S classification>
     2. `5.8S`: Use the 5.8S classification and ignore the ITS classification
     3. `ITS`: Use the ITS2 classification and ignore the 5.8S classification
-* **primerError** How many errors should be allowed when checking if forward and reverse primer are present.
+* **primerError** How many errors (given as error rate i.e. 0.1=10%) should be allowed when checking if forward and reverse primer are present.
 * **maxAmplLen** Maximum length of amplicons without the amplification primers. Will be passed to pears `-m` option.
 * **minAmplLen** Minimum length of amplicons without the amplification primers. Will be passed to pears `-n` option.
 
@@ -80,7 +80,7 @@ to build the database the pipeline will query the NCBI taxonomy database. NCBI r
 ## Running the pipeline
 
 * Open a terminal and navigate to your working directory.
-* type the following command: `snakemake -s metabarcoding.snakemake.py -j 6` where "6" is the number of processors to use
+* type the following command: `snakemake --use-conda -s metabarcoding.snakemake.py -j 6` where "6" is the number of processors to use
 
 ## Hidden Features
 Some output files are not generated by default. Here is how to get them:
