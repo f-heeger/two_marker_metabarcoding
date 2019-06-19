@@ -23,7 +23,7 @@ def qc_multiqc_input(wildcards):
 
 rule qc_multiqc:
     input: qc_multiqc_input
-    output: "QC/multiqc_report.html", "QC/multiqc_data/multiqc_fastqc.txt"
+    output: "QC/multiqc_report.html", "QC/multiqc_data/multiqc_data.json"
     log: "logs/multiqc.txt"
     conda:
         "envs/multiqc.yaml"
@@ -31,20 +31,11 @@ rule qc_multiqc:
         "multiqc -f --interactive -o QC QC/*_fastqc.zip &> {log}" % config
 
 rule qc_readCounts:
-    input: "QC/multiqc_data/multiqc_fastqc.txt"
+    input: "QC/multiqc_data/multiqc_data.json"
     output: "readNumbers/rawReadNumbers.tsv"
-    run:
-        with open(output[0], "w") as out:
-            for l, line in enumerate(open(input[0])):
-                if l==0:
-                    continue #skip header
-                arr = line.strip("\n").split("\t")
-                #Sample	avg_sequence_length	percent_dedup	percent_duplicates	seq_len_read_count	seq_len_bp	sequence_length	total_sequences	percent_gc
-                sample, lane, readNum, part = arr[0].rsplit("_", 3)
-                if readNum != "R1":
-                    continue # only use R1
-                seqNum = int(float(arr[-2]))
-                out.write("%s\t%i\n" % (sample, seqNum))
+    script:
+        "scripts/qcReadNumber.py"
+
 
 rule init_filterPrimer:
     input: r1="raw/all_R1.fastq.gz", r2="raw/all_R2.fastq.gz"
@@ -54,26 +45,15 @@ rule init_filterPrimer:
     conda:
         "envs/cutadapt.yaml"
     shell:
-        "cutadapt -g X%(forward_primer)s -A %(reverse_primer)sX --action none --discard-untrimmed --cores {threads} --error-rate %(primerErr)f -o {output.r1} -p {output.r2} {input.r1} {input.r2} > {log}" % config
+        "cutadapt -g X%(forward_primer)s -G X%(reverse_primer)s --action none --discard-untrimmed --cores {threads} --error-rate %(primerErr)f -o {output.r1} -p {output.r2} {input.r1} {input.r2} > {log}" % config
 
 rule init_primerReadNumbers:
     input: reads="primers/all_primers_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
     output: "readNumbers/primerReadNumbers.tsv"
-    run:
-        readSample = {}
-        for line in open(input.sample):
-            read, sample = line.strip("\n").split("\t")
-            readSample[read] = sample
-        sampleReads = {}
-        for rec in SeqIO.parse(gzip.open(input.reads, "rt"), "fastq"):
-            sample = readSample[rec.id]
-            try:
-                sampleReads[sample] += 1
-            except KeyError:
-                sampleReads[sample] = 1
-        with open(output[0], "w") as out:
-            for sample, value in sampleReads.items():
-                out.write("%s\t%s\n" % (sample, value))
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/primerReadNumber.py"
 
 rule init_trimming:
     input: r1="primers/all_primers_R1.fastq.gz", r2="primers/all_primers_R2.fastq.gz"
@@ -97,21 +77,11 @@ rule init_trimmStats:
 rule init_trimmedReadNumbers:
     input: reads="trimmed/all_trimmed_R1.fastq.gz", sample="readInfo/sample_R1.tsv"
     output: "readNumbers/trimmedReadNumbers.tsv"
-    run:
-        readSample = {}
-        for line in open(input.sample):
-            read, sample = line.strip("\n").split("\t")
-            readSample[read] = sample
-        sampleReads = {}
-        for rec in SeqIO.parse(gzip.open(input.reads, "rt"), "fastq"):
-            sample = readSample[rec.id]
-            try:
-                sampleReads[sample] += 1
-            except KeyError:
-                sampleReads[sample] = 1
-        with open(output[0], "w") as out:
-            for sample, value in sampleReads.items():
-                out.write("%s\t%s\n" % (sample, value))
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/trimmedReadNumber.py"
+
 
 rule init_merge:
     input: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
@@ -135,29 +105,18 @@ rule init_convertMerged:
 rule init_mergedReadNumbers:
     input: reads="merged/all.assembled.fastq", sample="readInfo/sample_R1.tsv"
     output: "readNumbers/mergedReadNumbers.tsv"
-    run:
-        readSample = {}
-        for line in open(input.sample):
-            read, sample = line.strip("\n").split("\t")
-            readSample[read] = sample
-        sampleReads = {}
-        for rec in SeqIO.parse(open(input.reads), "fastq"):
-            sample = readSample[rec.id]
-            try:
-                sampleReads[sample] += 1
-            except KeyError:
-                sampleReads[sample] = 1
-        with open(output[0], "w") as out:
-            for sample, value in sampleReads.items():
-                out.write("%s\t%s\n" % (sample, value))
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/mergeReadNum.py"
 
 rule init_readNumberOverview:
-    input: raw="readNumbers/rawReadNumbers.tsv", indexQual="readNumbers/indexQualityReadNumbers.tsv", primer="readNumbers/primerReadNumbers.tsv", trimmed="readNumbers/trimmedReadNumbers.tsv", merged="readNumbers/mergedReadNumbers.tsv"
+    input: raw="readNumbers/rawReadNumbers.tsv", primer="readNumbers/primerReadNumbers.tsv", trimmed="readNumbers/trimmedReadNumbers.tsv", merged="readNumbers/mergedReadNumbers.tsv"
     output: "readNumbers/readNumbers.pdf"
     conda:
         "envs/ggplot.yaml"
     script:
-        "scripts/plotReadnumbers.R"
+        "scripts/plotReadNumber.R"
 
 rule init_dereplicate1:
     input: "merged/all.fasta"

@@ -17,7 +17,7 @@
     "reverse_primer": "AATCCTCCGCTTAYTRATATGC",
     "email": "",
     "conflictBehavior": "mark",
-    "primerErr": 0.05,
+    "primerErr": 0.2,
     "minAmplLen": 150,
     "maxAmplLen": 550,
     "unite_version": "01.12.2017",
