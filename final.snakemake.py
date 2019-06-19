@@ -71,7 +71,7 @@ rule final_creatOtuTable:
     output: "otu_table.tsv"
     params: samples=samples
     script:
-        "scripts/createOtuTable.py"
+        "scripts/createOtuTab.py"
 
 rule final_kronaPrepStep1:
     input: tax="taxonomy/all.ITS2.otus.combClass.tsv", otuReads = "swarm/{sample}.ITS2.otus.out"

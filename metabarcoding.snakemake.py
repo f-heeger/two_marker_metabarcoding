@@ -6,7 +6,7 @@ min_version("3.5.4")
 configfile: "config.json"
 
 
-samples = config["samples"].keys()
+samples = list(config["samples"].keys())
 
 rule all:
     input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv", "otu_table.tsv", "All.rarefactions.pdf"

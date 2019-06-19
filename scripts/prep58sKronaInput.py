@@ -12,7 +12,7 @@ for line in open(snakemake.input.cls):
     read, cls = line.strip("\n").split("\t")
     readCls[read] = cls
 
-for outPath in output:
+for outPath in snakemake.output:
     sample = outPath.split("/")[1][:-9]
     with open(outPath, "w") as out:
         clsCount = {}

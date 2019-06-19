@@ -5,4 +5,4 @@ source activate snakemake5.4.2
 
 snakemake --use-conda -s metabarcoding.snakemake.py $@
 
-deactivate
+conda deactivate

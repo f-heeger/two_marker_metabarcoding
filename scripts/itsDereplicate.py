@@ -18,5 +18,5 @@ for line in open(snakemake.input.txt):
     
 with open(snakemake.output.tsv, "w") as out:
     for seq, cluster in seq2cluster.items():
-        if clusterSize[cluster] >= params.minsize:
+        if clusterSize[cluster] >= snakemake.params.minsize:
             out.write("%s\t%s\n" % (seq, cluster))

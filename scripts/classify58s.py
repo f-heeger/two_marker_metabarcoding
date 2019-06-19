@@ -13,7 +13,7 @@ identFilter = 0
 covFilter = 0
 tax = {}
 
-for line in open(snakmake.input.tax):
+for line in open(snakemake.input.tax):
     tId, tLin = line.strip().split("\t")
     tax["%s" % tId] = tLin
 
@@ -51,7 +51,7 @@ with open(snakemake.output[0], "w") as out:
         else:
             sortedHits = sorted(hits, key=lambda x: x[1])[::-1]
             cutoff = 0
-            while cutoff < len(sortedHits) and sortedHits[cutoff][1] >= (1.0-snakemake.topPerc)*sortedHits[0][1]:
+            while cutoff < len(sortedHits) and sortedHits[cutoff][1] >= (1.0-topPerc)*sortedHits[0][1]:
                 cutoff += 1
             lineage = lca([hit[0] for hit in sortedHits[:cutoff]], snakemake.params.stringency)
             out.write("%s\t%s\n" % (key, lineage))

@@ -1,5 +1,5 @@
 {
-    "inFolder": "/home/heeger/spree/raw_data/2016/illumina/160531_2014-04-MM-MycolinkMetabarcoding-Run1/Data/Intensities/BaseCalls",
+    "inFolder": "Metabarcoding-Run1/Data/Intensities/BaseCalls",
     "dbFolder": "dbs",
     "samples": {"92_S1": "92",
                 "108_S2": "108",

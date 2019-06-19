@@ -4,7 +4,7 @@ from helpers import *
 
 pos = {}
 
-for seqId, entry in ITSxParser(open(snakmake.input.pos)):
+for seqId, entry in ITSxParser(open(snakemake.input.pos)):
     pos[seqId] = entry
 
 with open(snakemake.output.fasta, "w") as out, open(snakemake.output.gtf, "w") as gtf:

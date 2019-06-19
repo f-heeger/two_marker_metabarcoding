@@ -2,12 +2,10 @@
 rule its_copyIts:
     input: "itsx/all.ITS2.fasta"
     output: "itsx/all.ITS2_extracted.fasta"
-    run:
-        with open(output[0], "w") as out:
-            for rec in SeqIO.parse(open(input[0]), "fasta"):
-                rId, sizeStr = rec.id.split("|")[0].strip(";").split(";")
-                rec.id = "%s|ITS2;%s;" % (rId, sizeStr)
-                out.write(rec.format("fasta"))
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/copyIts.py"
 
 rule its_goodReads:
     input: "itsx/all.ITS2_extracted.fasta"
@@ -71,7 +69,7 @@ rule its_createOtuReads:
     input: otuList="swarm/all.ITS2.otus.out", repIts="readInfo/all.repITS2.tsv", repSeq="readInfo/all.repseq.tsv"
     output: "swarm/all.otuReads.tsv"
     script:
-        "scripts/outReads.py"
+        "scripts/otuReads.py"
 
 
 rule its_readClassification:

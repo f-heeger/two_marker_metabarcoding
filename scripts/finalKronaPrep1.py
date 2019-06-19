@@ -1,3 +1,5 @@
+import json
+
 otuCount = {}
 for line in open(snakemake.input.otuReads):
     otuIdStr, count = line.strip("\n").split("\t")

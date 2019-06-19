@@ -34,6 +34,7 @@ rule r58S_dereplicate1:
 rule r58S_dereplicate2:
     input: txt="r58S_derep/all.uc.txt"
     output: tsv="readInfo/all.rep58S.tsv"
+    params: minsize=2
     run:
         seq2cluster = {}
         clusterSize = {}
@@ -72,7 +73,7 @@ rule r58S_classify:
     output: "taxonomy/all.58S.derep.class.tsv"
     params: maxE=1e-6, topPerc=5.0, minIdent=80.0, minCov=85.0, stringency=.90
     log: "logs/58s_class.log"
-    conad:
+    conda:
         "envs/biopython.yaml"
     script:
         "scripts/classify58s.py"
@@ -89,7 +90,7 @@ rule r58S_prepKronaInput:
     input: cls="taxonomy/all_5_8S_classification.tsv", sample="readInfo/sample_R1.tsv"
     output: expand("krona/{sample}_5_8S.tsv", sample=samples)
     script:
-        "prep58sKronaInput.py"
+        "scripts/prep58sKronaInput.py"
 
 rule r58S_krona:
     input: expand("krona/{sample}_5_8S.tsv", sample=samples)

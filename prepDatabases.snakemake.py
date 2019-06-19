@@ -18,6 +18,8 @@ rule db_makeRfamFiles:
     input: fasta="%(dbFolder)s/RF00002_%(rfam_version)s.fasta.gz" % config
     output: fasta="%(dbFolder)s/RF00002_%(rfam_version)s_dna.fasta" % config, tax="%(dbFolder)s/RF00002_%(rfam_version)s_tax.tsv" % config
     log: "%(dbFolder)s/logs/rfam_tax_log.txt" % config
+    conda:
+        "envs/biopython.yaml"
     script:
         "scripts/getRfamFile.py"
 
@@ -53,7 +55,7 @@ rule db_extract58S:
     conda:
         "envs/itsx.yaml"
     shell:
-        "ITSx -t . -i {input} -o %(dbFolder)s/ITSx/unite_%(unite_version)s --save_regions 5.8S --cpu {threads} --graphical F &> {log}"
+        "ITSx -t . -i {input} -o %(dbFolder)s/ITSx/unite_%(unite_version)s --save_regions 5.8S --cpu {threads} --graphical F &> {log}" % config
 
 rule cat58S:
     input: "%(dbFolder)s/ITSx/unite_%(unite_version)s.5_8S.fasta" % config, "%(dbFolder)s/RF00002_%(rfam_version)s_dna.fasta" % config

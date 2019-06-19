@@ -1,5 +1,7 @@
 import gzip
 
+from Bio import Entrez, SeqIO
+
 from NcbiMap import NuclId2TaxIdMap, LineageMap
 
 ranks = ["superkingdom","kingdom", "phylum", "class", "order", "family", "genus", "species"]
@@ -16,11 +18,9 @@ noId = 0
 noLin = 0
 
 with open(snakemake.output.fasta, "w") as out, \
-     open(snakmake.output.tax, "w") as taxOut, \
-     open(snakmake.log[0], "w") as logFile:
-    for rec in SeqIO.parse(gzip.open(input.fasta, "rt"), "fasta"):
-        
-        
+     open(snakemake.output.tax, "w") as taxOut, \
+     open(snakemake.log[0], "w") as logFile:
+    for rec in SeqIO.parse(gzip.open(snakemake.input.fasta, "rt"), "fasta"):
         sId, reg = rec.id.split("/")
         rec.id="%s|%s" % (sId, reg)
         try:

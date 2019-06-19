@@ -1,6 +1,6 @@
 library(ggplot2)
         
-raw=read.table(sankemake@input)
+raw=read.table(snakemake@input[[1]])
 colnames(raw) = c("sample", "x", "y")
 
 allPlotData = data.frame()
@@ -35,4 +35,4 @@ allPlotData = rbind(allPlotData, plotData)
 }
 
 ggplot(allPlotData, aes(x, mean)) + geom_point(aes(color=sample), size=0.1) + geom_ribbon(aes(ymin=cmin, ymax=cmax, fill=sample), alpha=0.2) + annotate("text", x=anno$x, y=anno$mean, label=anno$sample)
-ggsave(snakmake@output, width=16, height=9)
+ggsave(snakemake@output[[1]], width=16, height=9)

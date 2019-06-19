@@ -1,5 +1,7 @@
 from Bio import SeqIO
 
+from helpers import *
+
 logOut = open(snakemake.log[0], "w")
 tax = {}
 for line in open(snakemake.input.tax):
@@ -19,7 +21,7 @@ for rec in SeqIO.parse(open(snakemake.input.otus), "fasta"):
     classifi[rec.id] = []
     itsLength[rec.id.split("|", 1)[0]] = len(rec)
 
-for line in open(input.lam, encoding="latin-1"):
+for line in open(snakemake.input.lam, encoding="latin-1"):
     total +=1
     qseqid, sseqid, pident, length, mismatch, gapopen, qstart, qend, sstart, send, evalue, bitscore = line.strip().split("\t")
     readId = qseqid.split("|",1)[0]

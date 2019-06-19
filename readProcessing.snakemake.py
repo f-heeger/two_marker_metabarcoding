@@ -11,7 +11,7 @@ rule init_concat:
 rule qc_fastqc:
     input: "%(inFolder)s/{sample}_L001_R{read_number}_001.fastq.gz" % config
     output: "QC/{sample}_L001_R{read_number}_001_fastqc.zip"
-    log: "logs/fastqc_{sample}.txt"
+    log: "logs/fastqc_{sample}_R{read_number}.txt"
     threads: 6
     conda:
         "envs/fastqc.yaml"
@@ -91,7 +91,7 @@ rule init_trimmStats:
     output: "logs/{sample}_trimmStats.pdf"
     conda:
         "envs/ggplot.yaml"
-    run:
+    script:
         "scripts/trimStats.R"
 
 rule init_trimmedReadNumbers:

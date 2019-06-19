@@ -36,7 +36,7 @@ for line in open(snakemake.input.combCls):
 
 with open(snakemake.output.comp, "w") as out, open(snakemake.output.stat, "w") as stat:
     out.write("read\tsample\tOTU\tITS OTU Class\t5.8S read Class\t5.8S OTU Class\tComb OTU Class\n")
-    for line in open(input.otuReads):
+    for line in open(snakemake.input.otuReads):
         otuIdStr, readId = line.strip("\n").split("\t")
         otuId = otuIdStr.split("|")[0]
         out.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (readId,

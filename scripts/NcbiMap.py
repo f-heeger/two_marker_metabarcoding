@@ -1,3 +1,7 @@
+import csv
+
+from Bio import Entrez
+
 class NcbiMap(dict):
     """Base class for a dictonary relying on the BioPython NCBI interface for 
     assignments.

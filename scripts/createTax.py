@@ -1,3 +1,4 @@
+from helpers import *
 
 clu={}
 
@@ -18,7 +19,7 @@ for line in open(snakemake.input.uTax):
     uTax[tId] = tLin
 
 rTax = {}
-for line in open(snakmake.input.rTax):
+for line in open(snakemake.input.rTax):
     tId, tLin = line.strip().split("\t")
     rTax[tId] = tLin
 

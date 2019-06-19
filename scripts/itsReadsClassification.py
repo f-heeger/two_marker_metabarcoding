@@ -1,5 +1,5 @@
 otuReads = {}
-for line in open(snakmake.input.otuReads):
+for line in open(snakemake.input.otuReads):
     otuId, readId = line.strip().split("\t")
     try:
         otuReads[otuId].append(readId)
@@ -7,7 +7,7 @@ for line in open(snakmake.input.otuReads):
         otuReads[otuId] = [readId]
 
 readClass = {}
-for line in open(input.tax):
+for line in open(snakemake.input.tax):
     otuName, classification = line.strip().split("\t")
     otuId, sizeStr = otuName.strip(";").split(";")
     count = int(sizeStr.split("=")[1])
@@ -23,6 +23,6 @@ for line in open(input.tax):
     for read in otuReads[otuId]:
         readClass[read] = ";".join(cls)
 
-with open(snakmake.output.cls, "w") as out:
+with open(snakemake.output.cls, "w") as out:
     for read, cls in readClass.items():
         out.write("%s\t%s\n" % (read, cls))
