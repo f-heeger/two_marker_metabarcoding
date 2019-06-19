@@ -85,25 +85,25 @@ rule init_trimmedReadNumbers:
 
 rule init_merge:
     input: r1="trimmed/all_trimmed_R1.fastq.gz", r2="trimmed/all_trimmed_R2.fastq.gz"
-    output: "merged/all.assembled.fastq"
+    output: "merged/all_merged.fasta"
     params: minOverlap=10
     threads: 3
-    log: "logs/all_pear.log"
+    log: "logs/all_merge.log"
     conda:
-        "envs/pear.yaml"
+        "envs/vsearch.yaml"
     shell:
-        "pear -j {threads} -f {input.r1} -r {input.r2} -o merged/all -n %(minAmplLen)s -m %(maxAmplLen)s -v {params.minOverlap} &> {log}" % config
+        "vsearch --threads {threads} --fastq_mergepairs {input.r1} --reverse {input.r2} --fastaout {output} --fastq_allowmergestagger --fastq_minmergelen %(minAmplLen)s --fastq_maxmergelen %(maxAmplLen)s --fastq_minovlen {params.minOverlap} &> {log}" % config
 
-rule init_convertMerged:
-    input: "merged/all.assembled.fastq"
-    output: "merged/all.fasta"
-    conda:
-        "envs/biopython.yaml"
-    script:
-        "scripts/convertMerged.py"
+#rule init_convertMerged:
+#    input: "merged/all.assembled.fastq"
+#    output: "merged/all.fasta"
+#    conda:
+#        "envs/biopython.yaml"
+#    script:
+#        "scripts/convertMerged.py"
 
 rule init_mergedReadNumbers:
-    input: reads="merged/all.assembled.fastq", sample="readInfo/sample_R1.tsv"
+    input: reads="merged/all_merged.fasta", sample="readInfo/sample_R1.tsv"
     output: "readNumbers/mergedReadNumbers.tsv"
     conda:
         "envs/biopython.yaml"
@@ -119,7 +119,7 @@ rule init_readNumberOverview:
         "scripts/plotReadNumber.R"
 
 rule init_dereplicate1:
-    input: "merged/all.fasta"
+    input: "merged/all_merged.fasta"
     output: fasta="init_derep/all.derep.fasta", txt="init_derep/all.uc.txt"
     log: "logs/all_repSeq.log"
     conda:

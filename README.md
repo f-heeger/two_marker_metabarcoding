@@ -19,7 +19,6 @@ The following tools will be automatically installed by Snakemake trough conda. M
 * [ITSx](http://microbiology.se/software/itsx/)
 * [cutadapt](https://github.com/marcelm/cutadapt)
 * [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic)
-* [Pear](http://sco.h-its.org/exelixis/web/software/pear/)
 * [Krona](https://github.com/marbl/Krona/wiki/KronaTools)
 * [swarm](https://github.com/torognes/swarm)
 * [Lambda](http://seqan.github.io/lambda/)
@@ -69,8 +68,8 @@ to build the database the pipeline will query the NCBI taxonomy database. NCBI r
     2. `5.8S`: Use the 5.8S classification and ignore the ITS classification
     3. `ITS`: Use the ITS2 classification and ignore the 5.8S classification
 * **primerError** How many errors (given as error rate i.e. 0.1=10%) should be allowed when checking if forward and reverse primer are present.
-* **maxAmplLen** Maximum length of amplicons without the amplification primers. Will be passed to pears `-m` option.
-* **minAmplLen** Minimum length of amplicons without the amplification primers. Will be passed to pears `-n` option.
+* **maxAmplLen** Maximum length of amplicons without the amplification primers. Will be passed to vsearch for merging.
+* **minAmplLen** Minimum length of amplicons without the amplification primers. Will be passed to vsearch for merging.
 
 #### Reference Data
 * **unite_version**: Release date of the UNITE database you want to use (default: 01.12.2017 i.e. version 7.2)

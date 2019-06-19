@@ -6,7 +6,7 @@ for line in open(snakemake.input.sample):
     readSample[read] = sample
 
 sampleReads = {}
-for rec in SeqIO.parse(open(snakemake.input.reads), "fastq"):
+for rec in SeqIO.parse(open(snakemake.input.reads), "fasta"):
     sample = readSample[rec.id]
     try:
         sampleReads[sample] += 1
