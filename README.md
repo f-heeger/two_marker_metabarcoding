@@ -5,17 +5,16 @@ There is a pre-print avialable on BioRxiv descibing this pipeline: [https://doi.
 
 ## Prerequisites
 
-### Python and Python libraries
+### Python, Python libraries and Snakemake
 
 * Python 3.x
-* BioPython
-* rpy2
-* snakemake (version 3.5.4 or newer)
+* [Biopython](https://biopython.org/)
+* [snakemake (version 3.5.4 or newer)](https://snakemake.readthedocs.io/en/stable)
 
 ### External Software
 
 * [FastQC](http://www.bioinformatics.babraham.ac.uk/projects/fastqc/)
-* [MultiQC](http://multiqc.info/) (optional)
+* [MultiQC](http://multiqc.info/)
 * [VSEARCH](https://github.com/torognes/vsearch)
 * [ITSx](http://microbiology.se/software/itsx/)
 * [cutadapt](https://github.com/marcelm/cutadapt)
@@ -37,11 +36,7 @@ Make sure that you installed all the prerequisites listed above.
 
 ### Preparing your working directory
 
-You can directly download the files into your working directory or clone the repository with git. Your working folder should contain three files beside this readme:
-
-   * `perpDatabases.snakemake.py`
-   * `metabarcoding.snakemake.py`
-   * `config.json`
+You can directly download the files into your working directory or clone the repository with git. 
 
 ### Setting up your configuration file
 
@@ -53,6 +48,13 @@ The configuration file gives the paths to all necessary resources (software and 
 
 For each software that is used during pipeline execution there is an entry that should contain the absolute path to the softwares binary or the command the software can be executed with. There are two exceptions to this. For Lambda the entry should be the path to the folder containing the lambda binary as well as the lambda-indexer binary. For Trimmomatic the path should be given for the Trimmomatic `.jar` file.
 
+#### Your e-mail adresse:
+to build the database the pipeline will query the NCBI taxonomy database. NCBI requires automated API calls like this to also send an e-mail address. Your e-mail address will not be used for anything else.
+
+#### Run the pipeline with test data:
+After setting software pathes and you e-mail address, you can run the pipeline on the provided test data to see if it is working correctly. This will also already download the neccessary reference data bases (see Reference Data below on how to set the database version).
+To do a test run, open a terminal, navigate to the pipeline working directory and type the following command: `snakemake -s metabarcoding.snakemake.py`. After everything is done you should see the message: `72 of 72  steps (100%) done`.
+
 #### Information about your run:
 
 * **inFolder**: the absolute path to the folder that contains the fastq files of the raw reads (after demultiplexing)
@@ -60,9 +62,6 @@ For each software that is used during pipeline execution there is an entry that 
 * **samples**: a list of key-value pairs describing your data. The list is enclosed by "{" and each entry is separated by a ",". They key gives the sample ID as it was used used in the sequencing run (what the files are called), while the value gives the names you want the samples identified by in the final result. Example: `{"A1_S1": "lake1_sample1", "A3_S2": "lake1_sample2", "B12_S3": "lake2_sample1"}`
 * **forward_primer**: the sequence of your forward amplification primer
 * **reverse_primer**: the sequence of your reverse amplification primer
-
-#### Your e-mail adresse:
-to build the database the pipeline will query the NCBI taxonomy database. NCBI requires automated API calls like this to also send an e-mail address. Your e-mail address will not be used for anything else.
 
 #### Configuration of pipeline behavior
 
@@ -78,6 +77,8 @@ to build the database the pipeline will query the NCBI taxonomy database. NCBI r
 * **unite_version**: Release date of the UNITE database you want to use (default: 01.12.2017 i.e. version 7.2)
 * **uniteUrl**: URL were the UNITE database should be downloaded from
 * **rfam_version**: Version of the RFAM database you want to use (default: 13.0)
+
+
 
 ## Running the pipeline
 
