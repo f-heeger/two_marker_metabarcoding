@@ -1,7 +1,7 @@
 import gzip
 import glob
 
-from bio import SeqIO
+from Bio import SeqIO
 
 with gzip.open(snakemake.output.comb, "wt") as combOut, \
      open(snakemake.output.sample, "w") as sampleOut, \
