@@ -97,10 +97,12 @@ rule its_kronaPrep:
 rule its_krona:
     input: expand("krona/{sample}_ITS2.krona.tsv", sample=samples)
     output: "krona/ITS2.krona.html"
+    log:
+        "logs/its2_krona.log"
     conda:
         "envs/krona.yaml"
     shell:
-        "ktImportText -o {output} {input}"
+        "ktImportText -o {output} {input} &> {log}"
 
 
 rule its_perSampleOtuReads:

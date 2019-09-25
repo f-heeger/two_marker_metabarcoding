@@ -95,8 +95,10 @@ rule r58S_prepKronaInput:
 rule r58S_krona:
     input: expand("krona/{sample}_5_8S.tsv", sample=samples)
     output: "krona/5_8s.krona.html"
+    log:
+        "logs/58S_krona.log"
     conda:
         "envs/krona.yaml"
     shell:
-        "ktImportText -o {output} {input}"
+        "ktImportText -o {output} {input} &> {log}"
 

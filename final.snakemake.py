@@ -89,7 +89,8 @@ rule final_kronaPrepStep2:
 rule final_kronaAll:
     input: "krona/All.krona.xml"
     output: "krona/All.krona.html"
+    log: "logs/kronaAll.log"
     conda:
         "envs/krona.yaml"
     shell:
-        "ktImportXML -o {output} {input}"
+        "ktImportXML -o {output} {input} &> {log}"
