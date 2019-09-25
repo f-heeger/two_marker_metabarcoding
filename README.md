@@ -1,7 +1,9 @@
 # Two marker metabarcoding pipeline
 Snakemake pipeline for analysis of metabarcoding data of fungi with more than one marker (5.8S and ITS2).
 
-There is a pre-print avialable on BioRxiv descibing this pipeline: [https://doi.org/10.1101/532358 ](https://www.biorxiv.org/content/10.1101/532358v1)
+The pipeline (v1.1) is described in out paper [Combining the 5.8S and ITS2 to improve classification of fungi](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13266). The current version (v1.2) differs from that in that it uses snakemakes conda integration for better portability and easy installation.
+
+There is also a pre-print avialable on BioRxiv descibing version 1.0 of this pipeline: [https://doi.org/10.1101/532358 ](https://www.biorxiv.org/content/10.1101/532358v1)
 
 ## Prerequisites
 
