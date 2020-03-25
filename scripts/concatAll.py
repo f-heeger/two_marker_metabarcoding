@@ -1,17 +1,12 @@
 import gzip
-import glob
 
 from Bio import SeqIO
 
 with gzip.open(snakemake.output.comb, "wt") as combOut, \
      open(snakemake.output.sample, "w") as sampleOut, \
      open(snakemake.output.name, "w") as nameOut:
-    for sample in snakemake.params.samples:
-        path = "%s/%s_L*_%s_*.fastq.gz" % (snakemake.config["inFolder"], sample, snakemake.wildcards.read)
-        inFiles=glob.glob(path)
-        if not inFiles:
-            raise RuntimeError("No file(s) found for sample %s at %s." % (sample, path))
-        for inFile in inFiles:
+    for sample, fileInfo in snakemake.params.files.items():
+        for inFile in fileIngo[int(snakemake.wildcards.red)]:
             with gzip.open(inFile, "rt") as inStream:
                 for rec in SeqIO.parse(inStream, "fastq"):
                     newId = "_".join(rec.id.split(":")[3:])
