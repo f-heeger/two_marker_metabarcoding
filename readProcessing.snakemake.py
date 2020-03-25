@@ -19,8 +19,15 @@ rule qc_fastqc:
         "fastqc --nogroup -o QC --threads {threads} {input} &> {log}" % config
 
 def qc_multiqc_input(wildcards):
-    return ["QC/%s_fastqc.zip" % f[0].split(".", 1)[1] for s in fileInfo.values()]
-         + ["QC/%s_fastqc.zip" % f[1].split(".", 1)[1] for s in fileInfo.values()]
+    rv = []
+    for fData in fileInfo.values():
+        for fileName in fData[0]:
+            #read 1
+            rv.append("QC/%s_fastqc.zip" % fileName.split(".", 1)[0])
+        for fileName in fData[1]:
+            #read 2
+            rv.append("QC/%s_fastqc.zip" % fileName.split(".", 1)[0])
+    return rv
 
 rule qc_multiqc:
     input: qc_multiqc_input
