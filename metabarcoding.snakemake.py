@@ -14,6 +14,8 @@ for line in open(config["sampleFile"]);
         fileInfo[sName] = [[], []]
     fileInfo[sName][int(rNr)-1].append(fileName)
 
+samples = list(fileInfo.keys())
+
 rule all:
     input: "krona/All.krona.html", "krona/5_8s.krona.html", "krona/ITS2.krona.html", "taxonomy/all.compareClass.tsv", "otu_table.tsv", "All.rarefactions.pdf", "readNumbers/readNumbers.pdf"
 

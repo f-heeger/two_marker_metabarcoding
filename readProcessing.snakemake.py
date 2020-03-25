@@ -1,8 +1,8 @@
 import itertools
 
-rule init_concat:
+rule init_concatAll:
     output: comb="raw/all_{read}.fastq.gz", sample="readInfo/sample_{read}.tsv", name="readInfo/name_{read}.tsv"
-    params: samples=samples
+    params: files=fileInfo
     conda:
         "envs/biopython.yaml"
     script:
@@ -19,7 +19,8 @@ rule qc_fastqc:
         "fastqc --nogroup -o QC --threads {threads} {input} &> {log}" % config
 
 def qc_multiqc_input(wildcards):
-    return ["QC/%s_L001_R%s_001_fastqc.zip" % (s,r) for s,r in itertools.product(samples, ["1","2"])]
+    return ["QC/%s_fastqc.zip" % f[0].split(".", 1)[1] for s in fileInfo.values()]
+         + ["QC/%s_fastqc.zip" % f[1].split(".", 1)[1] for s in fileInfo.values()]
 
 rule qc_multiqc:
     input: qc_multiqc_input
