@@ -6,7 +6,7 @@ with gzip.open(snakemake.output.comb, "wt") as combOut, \
      open(snakemake.output.sample, "w") as sampleOut, \
      open(snakemake.output.name, "w") as nameOut:
     for sample, fileInfo in snakemake.params.files.items():
-        for inFile in fileInfo[int(snakemake.wildcards.red)]:
+        for inFile in fileInfo[int(snakemake.wildcards.read)]:
             with gzip.open(inFile, "rt") as inStream:
                 for rec in SeqIO.parse(inStream, "fastq"):
                     newId = "_".join(rec.id.split(":")[3:])
