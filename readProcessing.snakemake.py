@@ -6,7 +6,7 @@ rule init_concatAll:
     conda:
         "envs/biopython.yaml"
     script:
-        "scripts/concat.py"
+        "scripts/concatAll.py"
 
 rule qc_fastqc:
     input: "%(inFolder)s/{sample}_L001_R{read_number}_001.fastq.gz" % config
