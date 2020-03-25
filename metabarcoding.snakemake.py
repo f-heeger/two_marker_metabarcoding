@@ -5,10 +5,10 @@ min_version("3.5.4")
 
 configfile: "config.json"
 
-samples = list(config["samples"].keys())
-
 fileInfo = {}
-for line in open(config["sampleFile"]);
+for line in open(config["sampleFile"]):
+    if line[0] == "#":
+        continue
     sName, rNr, fileName = line.strip("\n").split("\t")
     if sName not in fileInfo:
         fileInfo[sName] = [[], []]
