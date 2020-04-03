@@ -41,6 +41,7 @@ rule qc_multiqc:
 rule qc_readCounts:
     input: "QC/multiqc_data/multiqc_data.json"
     output: "readNumbers/rawReadNumbers.tsv"
+    params: files=fileInfo
     script:
         "scripts/qcReadNumber.py"
 
