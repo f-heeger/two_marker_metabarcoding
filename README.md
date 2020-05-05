@@ -81,9 +81,9 @@ To do a test run, open a terminal, navigate to the pipeline working directory an
 * **minAmplLen** Minimum length of amplicons without the amplification primers. Will be passed to vsearch for merging.
 
 #### Reference Data
-* **unite_version**: Release date of the UNITE database you want to use (default: 01.12.2017 i.e. version 7.2)
+* **unite_version**: Release date of the UNITE database you want to use (default: 04.02.2020 i.e. version 8.2). This needs to match the URL given below.
 * **uniteUrl**: URL were the UNITE database should be downloaded from
-* **rfam_version**: Version of the RFAM database you want to use (default: 13.0)
+* **rfam_version**: Version of the RFAM database you want to use (default: 14.2)
 
 
 

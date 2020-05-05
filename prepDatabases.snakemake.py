@@ -21,20 +21,20 @@ rule db_makeRfamFiles:
 
 
 rule db_getUniteFile:
-    output: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.fasta" % config
+    output: "%(dbFolder)s/sh_general_release_%(unite_version)s.tar.gz" % config
     log: "logs/unite_dl.log"
     shell:
         "wget -o {log} -O {output} %(uniteUrl)s;" % config
 
 rule db_unpackUniteFile:
-    input: "%(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.zip" % config
-    output: "%(dbFolder)s/sh_general_release_dynamic_all_%(unite_version)s.fasta" % config
+    input: "%(dbFolder)s/sh_general_release_%(unite_version)s.tar.gz" % config
+    output: "%(dbFolder)s/sh_general_release_all_%(unite_version)s/sh_general_release_dynamic_all_%(unite_version)s.fasta" % config
     log: "logs/unite_unpack.log" % config
     shell:
-        "unzip -d %(dbFolder)s %(dbFolder)s/sh_general_release_dynamic_%(unite_version)s.zip &> {log}" % config
+        "tar -xzf {input} -C %(dbFolder)s  &> {log}" % config
 
 rule db_makeUniteFiles:
-    input: "%(dbFolder)s/sh_general_release_dynamic_all_%(unite_version)s.fasta" % config
+    input: "%(dbFolder)s/sh_general_release_all_%(unite_version)s/sh_general_release_dynamic_all_%(unite_version)s.fasta" % config
     output: fasta="%(dbFolder)s/unite_%(unite_version)s.fasta" % config, tax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config, sh2gId="%(dbFolder)s/unite_%(unite_version)s_gIds.tsv" % config
     run:
         with open(output.fasta, "w") as fasta, open(output.tax, "w") as tax, open(output.sh2gId, "w") as sh2gId:
