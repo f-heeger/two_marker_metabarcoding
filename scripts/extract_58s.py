@@ -35,7 +35,7 @@ with open(snakemake.output.fasta, "w") as out, open(snakemake.output.gtf, "w") a
                         out.write(rec[0:start].format("fasta"))
 propMiss = (nothingFound+no58s+tooShort)/total
 if  propMiss > 0.10:
-    print("WARNING: in %f%% of all sequences no 5.8S was found. See %s for details." % (propMiss*100, snakmake.log[0]))
+    print("WARNING: in %f%% of all sequences no 5.8S was found. See %s for details." % (propMiss*100, snakemake.log[0]))
 with open(snakemake.log[0], "a") as logStream:
     logStream.write("-------- 5.8S Extraction --------\n")
     logStream.write("5.8S was found in %f%% of the %i sequences.\n" % ((1-propMiss)*100, total))
