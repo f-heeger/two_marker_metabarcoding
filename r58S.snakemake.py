@@ -66,7 +66,7 @@ rule r58S_align:
     conda:
         "envs/lambda.yaml"
     shell:
-        "lambda2 searchn -q {input.otus} -d {input.db} -o {output} -t {threads} &> {log}"
+        "lambda2 searchn -q {input.otus} -i {input.db} -o {output} -t {threads} &> {log}"
 
 rule r58S_classify:
     input: lam="lambda/all.58S.derep_vs_58SRef.m8", otus="r58S_derep/all.5_8S_derep.fasta", tax="%(dbFolder)s/58S_tax.tsv" % config
