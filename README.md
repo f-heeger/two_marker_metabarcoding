@@ -62,7 +62,7 @@ to build the database the pipeline will query the NCBI taxonomy database. NCBI r
 #### Run the pipeline with test data:
 After setting your e-mail address, you can run the pipeline on the provided test data to see if it is working correctly. This will also already download the necessary reference data bases (see Reference Data below on how to set the database version) and install needed software via conda.
 
-To do a test run, open a terminal, navigate to the pipeline working directory and type the following command: `snakemake -s metabarcoding.snakemake.py`. After everything is done you should see the message: `72 of 72  steps (100%) done`.
+To do a test run, open a terminal, navigate to the pipeline working directory and type the following command: `snakemake --use-conda -s metabarcoding.snakemake.py`. After everything is done you should see the message: `72 of 72  steps (100%) done`.
 
 #### Information about your run:
 
