@@ -40,6 +40,10 @@ Reference data will be downloaded and processed automatically
 
 You can directly download the files into your working directory or clone the repository with git. Your working folder should contain the files beside this readme:
 
+   * `envs`
+   * `scripts`
+   * `testData`
+   * `LICENSE`
    * `perpDatabases.snakemake.py`
    * `metabarcoding.snakemake.py`
    * `final.snakemake.py`
