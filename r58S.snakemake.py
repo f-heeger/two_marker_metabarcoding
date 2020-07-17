@@ -59,7 +59,7 @@ rule r58S_dereplicate2:
                     out.write("%s\t%s\n" % (seq, cluster))
 
 rule r58S_align:
-    input: otus="r58S_derep/all.5_8S_derep.fasta", db=directory("%(dbFolder)s/58S_derep.fasta.lambda" % config)
+    input: otus="r58S_derep/all.5_8S_derep.fasta", db="%(dbFolder)s/58S_derep.fasta.lambda" % config
     output: "lambda/all.58S.derep_vs_58SRef.m8"
     log: "logs/all_58s_lambda.log"
     threads: 3

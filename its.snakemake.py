@@ -46,14 +46,14 @@ rule its_clustering:
 
 
 rule its_alignToUnite:
-    input: otus="swarm/all.ITS2.otus.fasta", db=directory("%(dbFolder)s/unite_%(unite_version)s.fasta.lambda" % config)
+    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/unite_%(unite_version)s.fasta.lambda" % config
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3
     conda:
         "envs/lambda.yaml"
     shell:
-        "lambda2 searchn -q {input.otus} -i {input.db} -o {output} -p blastn -t {threads} &> {log}"
+        "lambda2 searchn -q {input.otus} -i {input.db} -o {output} -t {threads} &> {log}"
 
 rule its_classify:
     input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta",  tax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config

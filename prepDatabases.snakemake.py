@@ -81,19 +81,21 @@ rule createTax:
 
 rule db_creat58SIndex:
     input: "%(dbFolder)s/58S_derep.fasta" % config
-    output: dir("%(dbFolder)s/58S_derep.fasta.lambda" % config)
+    output: directory("%(dbFolder)s/58S_derep.fasta.lambda" % config)
+    log: "%(dbFolder)s/logs/create58Sdb.log" % config
     threads: 6
     conda:
         "envs/lambda.yaml"
     shell:
-        "lambda2 mkindexn -d {input} -t {threads}"
+        "lambda2 mkindexn -d {input} -t {threads} > {log}"
 
 rule db_creatUniteIndex:
     input: "%(dbFolder)s/unite_%(unite_version)s.fasta" % config
     output: directory("%(dbFolder)s/unite_%(unite_version)s.fasta.lambda" % config)
+    log: "%(dbFolder)s/logs/createITS2db.log" % config
     threads: 6
     conda:
         "envs/lambda.yaml"
     shell:
-        "lambda2 mkindexn -d {input} -t {threads}"
+        "lambda2 mkindexn -d {input} -t {threads} > {log}"
 
