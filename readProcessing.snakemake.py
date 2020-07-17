@@ -1,12 +1,12 @@
 import itertools
 
-rule init_concat:
+rule init_concatAll:
     output: comb="raw/all_{read}.fastq.gz", sample="readInfo/sample_{read}.tsv", name="readInfo/name_{read}.tsv"
-    params: samples=samples
+    params: files=fileInfo
     conda:
         "envs/biopython.yaml"
     script:
-        "scripts/concat.py"
+        "scripts/concatAll.py"
 
 rule qc_fastqc:
     input: "%(inFolder)s/{sample}_L001_R{read_number}_001.fastq.gz" % config
@@ -19,7 +19,15 @@ rule qc_fastqc:
         "fastqc --nogroup -o QC --threads {threads} {input} &> {log}" % config
 
 def qc_multiqc_input(wildcards):
-    return ["QC/%s_L001_R%s_001_fastqc.zip" % (s,r) for s,r in itertools.product(samples, ["1","2"])]
+    rv = []
+    for fData in fileInfo.values():
+        for fileName in fData[0]:
+            #read 1
+            rv.append("QC/%s_fastqc.zip" % fileName.split(".", 1)[0])
+        for fileName in fData[1]:
+            #read 2
+            rv.append("QC/%s_fastqc.zip" % fileName.split(".", 1)[0])
+    return rv
 
 rule qc_multiqc:
     input: qc_multiqc_input
@@ -33,6 +41,7 @@ rule qc_multiqc:
 rule qc_readCounts:
     input: "QC/multiqc_data/multiqc_data.json"
     output: "readNumbers/rawReadNumbers.tsv"
+    params: files=fileInfo
     script:
         "scripts/qcReadNumber.py"
 
