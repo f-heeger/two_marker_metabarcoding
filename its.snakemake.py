@@ -46,7 +46,7 @@ rule its_clustering:
 
 
 rule its_alignToUnite:
-    input: otus="swarm/all.ITS2.otus.fasta", db="%(dbFolder)s/unite_%(unite_version)s.fasta" % config, dbFlag="%(dbFolder)s/unite_%(unite_version)s.fasta.lambdaIndexCreated" % config
+    input: otus="swarm/all.ITS2.otus.fasta", db=dir("%(dbFolder)s/unite_%(unite_version)s.fasta.lambda" % config)
     output: "lambda/all.ITS2.otus_vs_UNITE.m8"
     log: "logs/all_lambda.log"
     threads: 3
