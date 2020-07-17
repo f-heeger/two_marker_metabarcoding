@@ -90,7 +90,7 @@ rule db_creat58SIndex:
 
 rule db_creatUniteIndex:
     input: "%(dbFolder)s/unite_%(unite_version)s.fasta" % config
-    output: dir("%(dbFolder)s/unite_%(unite_version)s.fasta.lambda" % config)
+    output: directory("%(dbFolder)s/unite_%(unite_version)s.fasta.lambda" % config)
     threads: 6
     conda:
         "envs/lambda.yaml"
