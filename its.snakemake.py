@@ -53,7 +53,7 @@ rule its_alignToUnite:
     conda:
         "envs/lambda.yaml"
     shell:
-        "lambda -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}"
+        "lambda2 searchn -q {input.otus} -d {input.db} -o {output} -p blastn -t {threads} &> {log}"
 
 rule its_classify:
     input: lam="lambda/all.ITS2.otus_vs_UNITE.m8", otus="swarm/all.ITS2.otus.fasta",  tax="%(dbFolder)s/unite_%(unite_version)s.tsv" % config

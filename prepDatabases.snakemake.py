@@ -86,7 +86,7 @@ rule db_creat58SIndex:
     conda:
         "envs/lambda.yaml"
     shell:
-        "lambda_indexer -d {input} -p blastn -t {threads}"
+        "lambda2 mkindexn -d {input} -t {threads}"
 
 rule db_creatUniteIndex:
     input: "%(dbFolder)s/unite_%(unite_version)s.fasta" % config
@@ -95,5 +95,5 @@ rule db_creatUniteIndex:
     conda:
         "envs/lambda.yaml"
     shell:
-        "lambda_indexer -d {input} -p blastn -t {threads}"
+        "lambda2 mkindexn -d {input} -t {threads}"
 
