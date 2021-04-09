@@ -40,7 +40,7 @@ Reference data will be downloaded and processed automatically
 
 ### Preparing your working directory
 
-You can directly download the files into your working directory or clone the repository with git. Your working folder should contain the files beside this readme:
+You can directly download the files into your working directory or clone the repository with git. Your working folder should contain the following files beside this readme:
 
    * `envs`
    * `scripts`
@@ -80,7 +80,7 @@ To do a test run, open a terminal, navigate to the pipeline working directory an
 #### Configuration of pipeline behavior
 
 * **conflictBehavior** This parameter defines what the pipeline will do if the 5.8S and ITS2 classifications differ from each other. There are three possible values:
-    1. `mark`: The conflict is marked in the classification with an entry of the form: <ITS classification>|<5.8S classification>
+    1. `mark`: The conflict is marked in the classification with an entry of the form: \<ITS classification>|<5.8S classification>
     2. `5.8S`: Use the 5.8S classification and ignore the ITS classification
     3. `ITS`: Use the ITS2 classification and ignore the 5.8S classification
 * **primerError** How many errors (given as error rate i.e. 0.1=10%) should be allowed when checking if forward and reverse primer are present.
