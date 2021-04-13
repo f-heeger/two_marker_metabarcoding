@@ -1,7 +1,7 @@
 import itertools
 
 rule init_concatAll:
-    output: comb="raw/all_{read}.fastq.gz", sample="readInfo/sample_{read}.tsv", name="readInfo/name_{read}.tsv"
+    output: comb="raw/all_R{readNum}.fastq.gz", sample="readInfo/sample_R{readNum}.tsv", name="readInfo/name_R{readNum}.tsv"
     params: files=fileInfo
     conda:
         "envs/biopython.yaml"
@@ -9,9 +9,9 @@ rule init_concatAll:
         "scripts/concatAll.py"
 
 rule qc_fastqc:
-    input: "%(inFolder)s/{sample}_L001_R{read_number}_001.fastq.gz" % config
-    output: "QC/{sample}_L001_R{read_number}_001_fastqc.zip"
-    log: "logs/fastqc_{sample}_R{read_number}.txt"
+    input: "%(inFolder)s/{sampleFileName}.fastq.gz" % config
+    output: "QC/{sampleFileName}_fastqc.zip"
+    log: "logs/fastqc_{sampleFileName}.txt"
     threads: 6
     conda:
         "envs/fastqc.yaml"
@@ -23,10 +23,10 @@ def qc_multiqc_input(wildcards):
     for fData in fileInfo.values():
         for fileName in fData[0]:
             #read 1
-            rv.append("QC/%s_fastqc.zip" % fileName.split(".", 1)[0])
+            rv.append("QC/%s_fastqc.zip" % fileName.rsplit(".", 2)[0])
         for fileName in fData[1]:
             #read 2
-            rv.append("QC/%s_fastqc.zip" % fileName.split(".", 1)[0])
+            rv.append("QC/%s_fastqc.zip" % fileName.rsplit(".", 2)[0])
     return rv
 
 rule qc_multiqc:

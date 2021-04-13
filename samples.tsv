@@ -4,7 +4,7 @@ test1	1	test1_S1_L001_R1_001.fastq.gz
 test2	1	test2_S2_L001_R1_001.fastq.gz
 test3	1	test3_S3_L001_R1_001.fastq.gz
 test4	1	test4_S4_L001_R1_001.fastq.gz
-test5	1	test5_S5_L001_R1_001.fastq.gz
+test5	1	test5_withDifferentNamingScheme.1.fastq.gz
 test6	1	test6_S6_L001_R1_001.fastq.gz
 test7	1	test7_S7_L001_R1_001.fastq.gz
 test8	1	test8_S8_L001_R1_001.fastq.gz
@@ -17,7 +17,7 @@ test1	2	test1_S1_L001_R2_001.fastq.gz
 test2	2	test2_S2_L001_R2_001.fastq.gz
 test3	2	test3_S3_L001_R2_001.fastq.gz
 test4	2	test4_S4_L001_R2_001.fastq.gz
-test5	2	test5_S5_L001_R2_001.fastq.gz
+test5	2	test5_withDifferentNamingScheme.2.fastq.gz
 test6	2	test6_S6_L001_R2_001.fastq.gz
 test7	2	test7_S7_L001_R2_001.fastq.gz
 test8	2	test8_S8_L001_R2_001.fastq.gz
