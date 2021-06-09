@@ -3,7 +3,7 @@ Snakemake pipeline for analysis of metabarcoding data of fungi with more than on
 
 The pipeline (v1.1) is described in out paper [Combining the 5.8S and ITS2 to improve classification of fungi](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13266). 
 
-The current version (v1.3) can be found on the [release page](https://github.com/f-heeger/two_marker_metabarcoding/releases). It differs from version in the paper in that it uses snakemakes conda integration for better portability and easy installation. I also changed some external dependencies. See the release notes for further detail.
+The current version (v1.4) can be found on the [release page](https://github.com/f-heeger/two_marker_metabarcoding/releases). It differs from version in the paper in that it uses snakemakes conda integration for better portability and easy installation. Additionally input file handling is handled in a way that is less reliant on default Illumina file names and allows for more complicated experimental setups (e.g. the same sample in multiple runs). I also changed some external dependencies. See the release notes for further detail.
 
 There is also a pre-print available on BioRxiv describing version 1.0 of this pipeline: [https://doi.org/10.1101/532358 ](https://www.biorxiv.org/content/10.1101/532358v1)
 
@@ -111,6 +111,11 @@ The repository also contains a bash script called `run.sh`. I recommend using th
 
 All parameters you give to the `run.sh` script (e.g. `-j 6`) will be passed on to snakemake.
 
+## Output Files
+The pipeline creates different folders for the intermediate files after each step and the final result files.
+The most important result is `otu_table.tsv` that is created in the working directory. It contains the number of reads that were assigned to the OTUs in each sample as well as the taxonomic classification of the OTUs. Each row represents one OTU. The first column is the OTU ID, the second, third and forth column are the taxonomic classifications by 5.8S, ITS2 and both combined respectively. The following columns contain the number of reads per sample (see header for sample order).
+
+Other interesting outputs are the rarefaction plot (`All.rarefactions.pdf`), the plot of read numbers after each filtering step during the initial read processing (`readNumbers/readNumbers.pdf`) and the [Krona](https://github.com/marbl/Krona/wiki) plots of the read assignments per sample (`krona/All.krona.html`).
 
 
 ## Hidden Features
@@ -124,4 +129,4 @@ There are some non-standard features, that you will not need for a typical analy
     * Manually download the [general FASTA release](https://unite.ut.ee/repository.php) of UNITE that you want to use and unpack it
     * Create a folder called `sh_general_release_all_<unite_version>` in your `dbFolder` where `<unite_verstion>` is the version string you gave for the `unite_version` in the config file (e.g. 01.08.2015)
     * copy the fasta file, that was in your download from the UNITE website into the new folder and rename it to: `sh_general_release_dynamic_all_<unite_version>.fasta` where `<unite_verstion>` is the version string you gave for the `unite_version` in the config file (e.g. 01.08.2015)
-
+* **Frequency Table**: run `snakemake -s metabarcoding.snakemake.py freq_table.tsv` to create `freq_table.tsv`, which is the same as the OTU table except, that is does not contain taxonomic classifications and the fact that the read numbers are normalized to the total number of reads in that sample (i.e. relative read counts considering total number of reads in that sample instead of absolute read counts).
