@@ -3,7 +3,7 @@ Snakemake pipeline for analysis of metabarcoding data of fungi with more than on
 
 The pipeline (v1.1) is described in out paper [Combining the 5.8S and ITS2 to improve classification of fungi](https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/2041-210X.13266). 
 
-The current version (v1.4) can be found on the [release page](https://github.com/f-heeger/two_marker_metabarcoding/releases). It differs from version in the paper in that it uses snakemakes conda integration for better portability and easy installation. Additionally input file handling is handled in a way that is less reliant on default Illumina file names and allows for more complicated experimental setups (e.g. the same sample in multiple runs). I also changed some external dependencies. See the release notes for further detail.
+The current version (v1.3.1) can be found on the [release page](https://github.com/f-heeger/two_marker_metabarcoding/releases). It differs from version in the paper in that it uses snakemakes conda integration for better portability and easy installation. Additionally input file handling is handled in a way that is less reliant on default Illumina file names and allows for more complicated experimental setups (e.g. the same sample in multiple runs). I also changed some external dependencies. See the release notes for further detail.
 
 There is also a pre-print available on BioRxiv describing version 1.0 of this pipeline: [https://doi.org/10.1101/532358 ](https://www.biorxiv.org/content/10.1101/532358v1)
 
